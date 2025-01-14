@@ -1,6 +1,6 @@
 import { Context, Next } from "@oak/oak"
 
-import * as log from "./../logger.ts"
+import { log } from "./../logger.ts"
 
 export function matchChannelId (channels: Map<string, { kind: string, expiration: string }>) {
     

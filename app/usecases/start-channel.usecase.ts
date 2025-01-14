@@ -1,4 +1,4 @@
-import * as log from "../logger.ts"
+import { log } from "../logger.ts"
 import { AppConfig, getAccount, getGDriveClient } from "../repositories/config.repo.ts"
 import { ChannelRespository } from "../repositories/channel.repo.ts";
 

@@ -1,23 +1,30 @@
-const format = (level: string, message: string, ...args: unknown[]) => {
-    const ts = new Date().toISOString()
-    const fargs = args.length ? `${args.join(" ")}` : ""
-    return `[${ts}] ${level.padEnd(5)} : ${message} ${fargs}`
-}
+import { Log } from "@cross/log"
 
-const debug = (message: string, ...args: unknown[]) => {
-    console.debug(format("DEBUG", message, ...args))
-}
 
-const info = (message: string, ...args: unknown[]) => {
-    console.info(format("INFO", message, ...args))
-}
+// const format = (level: string, message: string, ...args: unknown[]) => {
+//     const ts = new Date().toISOString()
+//     const fargs = args.length ? `${args.join(" ")}` : ""
+//     return `[${ts}] ${level.padEnd(5)} : ${message} ${fargs}`
+// }
 
-const warn = (message: string, ...args: unknown[]) => {
-    console.warn(format("WARN", message, ...args))
-}
+// const debug = (message: string, ...args: unknown[]) => {
+//     console.debug(format("DEBUG", message, ...args))
+// }
 
-const error = (message: string, ...args: unknown[]) => {
-    console.error(format("ERROR", message, ...args))
-}
+// const info = (message: string, ...args: unknown[]) => {
+//     console.info(format("INFO", message, ...args))
+// }
 
-export { debug, info, warn, error }
+// const warn = (message: string, ...args: unknown[]) => {
+//     console.warn(format("WARN", message, ...args))
+// }
+
+// const error = (message: string, ...args: unknown[]) => {
+//     console.error(format("ERROR", message, ...args))
+// }
+
+// export { debug, info, warn, error }
+
+
+
+export const log = new Log()

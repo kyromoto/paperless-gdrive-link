@@ -1,6 +1,4 @@
-import { drive_v3 } from "googleapis";
-
-import * as log from "../logger.ts"
+import { log } from "../logger.ts"
 import { ChannelRespository } from "../repositories/channel.repo.ts";
 import { AppConfig, getGDriveClient } from "../repositories/config.repo.ts";
 

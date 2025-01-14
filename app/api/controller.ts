@@ -1,6 +1,6 @@
 import { Context } from "@oak/oak/context";
 
-import  * as log from "../logger.ts"
+import { log } from "../logger.ts"
 import { Queue } from "../queue.ts";
 import { AppConfig } from "../repositories/config.repo.ts";
 import { ChannelRespository } from "../repositories/channel.repo.ts";

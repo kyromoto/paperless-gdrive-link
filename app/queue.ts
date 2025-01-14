@@ -1,4 +1,4 @@
-import * as log from "./logger.ts"
+import { log } from "./logger.ts"
 
 export abstract class Queue<T> {
 

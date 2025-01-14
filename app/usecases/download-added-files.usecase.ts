@@ -1,24 +1,22 @@
-import * as path from "@std/path"
 import * as base64 from "@std/encoding/base64"
 
 import { drive_v3 } from "googleapis"
 
-import * as log from "../logger.ts"
-import { AppConfigRepository } from "../repositories/config.repo.ts";
+import { log } from "../logger.ts"
+import { AppConfig, getAccount, getChangeToken, getGDriveClient, setChangeToken } from "../repositories/config.repo.ts";
 
 
 
 
-export function downloadedAddedFilesUseCase(configRepo: AppConfigRepository) {
+export function downloadedAddedFilesUseCase(config: AppConfig) {
 
     return async (owner: string) => {
 
         try {
 
-        const appConfig = await configRepo.getConfig()
-        const account = await configRepo.getAccount(owner)
-        const drive = await configRepo.getDrive(owner)
-        const changeToken = await configRepo.getChangeToken(owner)
+        const account = getAccount(owner, config)
+        const drive = await getGDriveClient(owner, config)
+        const changeToken = await getChangeToken(owner, config)
 
         if (!account) {
             throw new Error(`Account ${owner} not found`)
@@ -28,7 +26,7 @@ export function downloadedAddedFilesUseCase(configRepo: AppConfigRepository) {
             throw new Error(`No drive found for ${owner}`)
         }
 
-        const { changes, newStartPageToken } = await listChangesRecursive(drive, appConfig, owner)(changeToken)
+        const { changes, newStartPageToken } = await listChangesRecursive(drive, config, owner)(changeToken)
 
         log.info("Fetched", changes.length, "changes")
         log.debug(JSON.stringify(changes, null, 2))
@@ -49,13 +47,13 @@ export function downloadedAddedFilesUseCase(configRepo: AppConfigRepository) {
         log.debug(JSON.stringify(addedFiles, null, 2))
 
 
-        await transferFilesRecursive(drive, appConfig, owner)(addedFiles)
+        await transferFilesRecursive(drive, config, owner)(addedFiles)
 
         if (!newStartPageToken) {
             throw new Error("No new start page token")
         }
 
-        await configRepo.setChangeToken(owner, newStartPageToken)
+        await setChangeToken(owner, newStartPageToken, config)
 
 
         } catch (err) {
@@ -71,7 +69,7 @@ export function downloadedAddedFilesUseCase(configRepo: AppConfigRepository) {
 
 
 
-const listChangesRecursive = (drive: drive_v3.Drive, CONFIG: AppConfig, owner: string) => {
+const listChangesRecursive = (drive: drive_v3.Drive) => {
 
     const fn = async (token?: string): Promise<{ newStartPageToken?: string, changes: drive_v3.Schema$Change[] }> => {
         const res = await drive.changes.list({
