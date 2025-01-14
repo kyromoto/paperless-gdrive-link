@@ -4,7 +4,7 @@ import * as base64 from "@std/encoding/base64"
 import { drive_v3 } from "googleapis"
 
 import * as log from "../logger.ts"
-import { AppConfigRepository } from "../repositories/app-config.repo.ts";
+import { AppConfigRepository } from "../repositories/config.repo.ts";
 
 
 

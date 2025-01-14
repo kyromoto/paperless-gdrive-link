@@ -2,12 +2,12 @@ import { Context } from "@oak/oak/context";
 
 import  * as log from "../logger.ts"
 import { Queue } from "../queue.ts";
-import { AppConfig } from "../repositories/app-config.repo.ts";
-import { ChannelRespository } from "../repositories.ts";
+import { AppConfig } from "../repositories/config.repo.ts";
+import { ChannelRespository } from "../repositories/channel.repo.ts";
 
 
 export type WebhookControllerDeps = {
-    appConfig: AppConfig
+    config: AppConfig
     channels: ChannelRespository
     downloadAddedFiles: (owner: string) => Promise<void>
 }
@@ -58,8 +58,8 @@ class WebhookQueue extends Queue<string> {
 
 export function WebhookController (deps: WebhookControllerDeps) {
 
-    const { appConfig, channels, downloadAddedFiles } = deps
-    const queue = new WebhookQueue(appConfig, channels, downloadAddedFiles)
+    const { config, channels, downloadAddedFiles } = deps
+    const queue = new WebhookQueue(config, channels, downloadAddedFiles)
 
     return async (ctx: Context<{ channelId: string }>) => {
 

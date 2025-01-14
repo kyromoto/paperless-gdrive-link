@@ -9,9 +9,9 @@ import { logWebhook, matchChannelId } from "./api/middleware.ts";
 import { stopChannelUseCase } from "./usecases/stop-channel.usecase.ts";
 import { downloadedAddedFilesUseCase } from "./usecases/download-added-files.usecase.ts";
 import { WebhookController } from "./api/controller.ts";
-import { AppConfigRepository } from "./repositories/app-config.repo.ts";
+import { getGDriveClient, loadAppConfig, setChangeToken } from "./repositories/config.repo.ts";
 import { startChannelUseCase } from "./usecases/start-channel.usecase.ts";
-import { ChannelRespository } from "./repositories.ts";
+import { ChannelRespository } from "./repositories/channel.repo.ts";
 
 
 const CONFIG_FILE = Deno.env.get("CONFIG_FILE")
@@ -23,27 +23,25 @@ if (!CONFIG_FILE) {
 }
 
 
-const configRepo = new AppConfigRepository(CONFIG_FILE)
+const config = await loadAppConfig(CONFIG_FILE)
 const channels: ChannelRespository = new Map()
 const app = new Application()
 const router = new Router()
 
-const startChannel = startChannelUseCase(configRepo, channels)
-const stopChannel = stopChannelUseCase(configRepo, channels)
-const downloadAddedFiles = downloadedAddedFilesUseCase(configRepo)
+const startChannel = startChannelUseCase(config, channels)
+const stopChannel = stopChannelUseCase(config, channels)
+const downloadAddedFiles = downloadedAddedFilesUseCase(config)
 
 
 log.debug(
   "AppConfig",
   CONFIG_FILE,
-  JSON.stringify(await configRepo.getConfig(), null, 2)
+  JSON.stringify(config, null, 2)
 )
 
-const appConfig = await configRepo.getConfig()
+for (const account of config.accounts) {
 
-for (const account of appConfig.accounts) {
-
-  const accountDataPath = path.join(appConfig.server.data_path, account.name)
+  const accountDataPath = path.join(config.server.data_path, account.name)
 
   await Deno.lstat(accountDataPath).catch(async () => {
     await Deno.mkdir(accountDataPath, { recursive: true })
@@ -51,7 +49,7 @@ for (const account of appConfig.accounts) {
 
   await Deno.lstat(path.join(accountDataPath, account.google_drive.credentials_file))
 
-  const drive = await configRepo.getDrive(account.name)
+  const drive = await getGDriveClient(account.name, config)
 
   if (!drive) {
     throw new Error(`No drive found for ${account.name}`)
@@ -64,7 +62,7 @@ for (const account of appConfig.accounts) {
     throw new Error(`Failed to get start page token for ${account.name}`)
   }
 
-  await configRepo.setChangeToken(account.name, token)
+  await setChangeToken(account.name, token, config)
 
 }
 
@@ -125,7 +123,7 @@ const timer = setInterval(async () => {
 router.post("/webhook",
   matchChannelId(channels),
   logWebhook(),
-  WebhookController({ downloadAddedFiles, appConfig, channels })
+  WebhookController({ downloadAddedFiles, config, channels })
 )
 
 // router.get("/channels", async (ctx: Context) => {
@@ -143,10 +141,10 @@ app.addEventListener("listen", async ({ secure, hostname, port }) => {
   
   log.info(`Listening on http${secure ? "s" : ""}://${hostname}:${port}`)
 
-  for (const account of appConfig.accounts) {
+  for (const account of config.accounts) {
     await startChannel(account.name)
   }
   
 })
 
-await app.listen({ port: Number(appConfig.server.port), secure: false })
+await app.listen({ port: Number(config.server.port), secure: false })

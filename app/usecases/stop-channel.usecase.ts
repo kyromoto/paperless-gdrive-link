@@ -1,12 +1,12 @@
 import { drive_v3 } from "googleapis";
 
 import * as log from "../logger.ts"
-import { ChannelRespository } from "../repositories.ts";
-import { AppConfigRepository } from "../repositories/app-config.repo.ts";
+import { ChannelRespository } from "../repositories/channel.repo.ts";
+import { AppConfig, getGDriveClient } from "../repositories/config.repo.ts";
 
 
 
-export function stopChannelUseCase(configRepo: AppConfigRepository, channels: ChannelRespository) {
+export function stopChannelUseCase(config: AppConfig, channels: ChannelRespository) {
 
     return async (channelId: string) => {
 
@@ -18,15 +18,15 @@ export function stopChannelUseCase(configRepo: AppConfigRepository, channels: Ch
 
 
 
-        const drive = await configRepo.getDrive(channel.owner)
+        const gdrive = await getGDriveClient(channel.owner, config)
 
-        if (!drive) {
+        if (!gdrive) {
             throw new Error(`No drive found for ${channel.owner}`)
         }
 
 
 
-        await drive.channels.stop({
+        await gdrive.channels.stop({
             requestBody: {
                 id: channelId,
                 resourceId: channel.ressourceId

@@ -1,24 +1,24 @@
 import * as log from "../logger.ts"
-import { AppConfigRepository } from "../repositories/app-config.repo.ts"
-import { ChannelRespository } from "../repositories.ts";
+import { AppConfig, getAccount, getGDriveClient } from "../repositories/config.repo.ts"
+import { ChannelRespository } from "../repositories/channel.repo.ts";
 
-export function startChannelUseCase(configRepo: AppConfigRepository, channels: ChannelRespository) {
+export function startChannelUseCase(config: AppConfig, channels: ChannelRespository) {
 
-    return async (name: string) => {
+    return async (owner: string) => {
 
-        const appConfig = await configRepo.getConfig()
-
-        const drive = await configRepo.getDrive(name)
-
-        if (!drive) {
-            throw new Error(`No drive found for ${name}`)
-        }
-
-        const account = await configRepo.getAccount(name)
+        const account = getAccount(owner, config)
 
         if (!account) {
-            throw new Error(`No account found for ${name}`)
+            throw new Error(`No account found for ${owner}`)
         }
+
+        const drive = await getGDriveClient(account.name, config)
+
+        if (!drive) {
+            throw new Error(`No drive found for ${account.name}`)
+        }
+
+
 
         const channelId = crypto.randomUUID()
         const now = Date.now()
@@ -28,14 +28,14 @@ export function startChannelUseCase(configRepo: AppConfigRepository, channels: C
             requestBody: {
                 id: channelId,
                 type: "web_hook",
-                address: appConfig.server.public_url + "/webhook",
+                address: config.server.public_url + "/webhook",
                 payload: true,
-                expiration: now + (appConfig.channel.expirationInSec * 1000)
+                expiration: now + (config.channel.expirationInSec * 1000)
             }
         })
 
         channels.set(res.data.id, {
-            owner: name,
+            owner: owner,
             kind: res.data.kind,
             expiration: res.data.expiration,
             ressourceId: res.data.resourceId
@@ -43,7 +43,7 @@ export function startChannelUseCase(configRepo: AppConfigRepository, channels: C
 
         const exp = new Date(Number(res.data.expiration))
 
-        log.info("Channel", res.data.id, ":", "created", name, res.data.kind, exp.toISOString())
+        log.info("Channel", res.data.id, ":", "created", owner, res.data.kind, exp.toISOString())
 
     }
 
