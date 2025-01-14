@@ -17,6 +17,8 @@ import { log } from "./logger.ts";
 
 const CONFIG_FILE = Deno.env.get("CONFIG_FILE")
 
+log.info("Application config file", CONFIG_FILE)
+
 if (!CONFIG_FILE) {
   throw new Error ("Failed to start application", {
     cause: "Missing CONFIG_FILE environment variable"
@@ -74,7 +76,6 @@ for (const account of config.accounts) {
 
 const handleExit = async (cause: string, ec: number) => {
 
-  // log.info("Shutdown application.", cause)
   log.info("Shutdown application.", cause)
 
   clearInterval(timer)
@@ -83,7 +84,6 @@ const handleExit = async (cause: string, ec: number) => {
 
   for (const [id, channel] of channels) {
     await stopChannel(id).catch(err => {
-      // log.error("Failed to stop channel", id, channel.owner, err)
       log.error("Failed to stop channel", id, channel.owner, err)
       exitCode++
     })
@@ -115,7 +115,7 @@ const timer = setInterval(async () => {
     return at < bt
   }, 60 * 1000)
 
-  // log.debug("Channels to renew", expChannels.length)
+  log.debug("Channels to renew", expChannels.length)
 
   for (const [id, channel] of expChannels) {
     await startChannel(channel.owner)
