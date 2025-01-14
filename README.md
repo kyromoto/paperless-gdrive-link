@@ -1,1 +1,1 @@
-# gdrive-watchfolder-integration
+# paperless-gdrive-link
