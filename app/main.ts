@@ -36,12 +36,6 @@ const stopChannel = stopChannelUseCase(config, channels)
 const downloadAddedFiles = downloadedAddedFilesUseCase(config)
 
 
-// log.debug(
-//   "AppConfig",
-//   CONFIG_FILE,
-//   JSON.stringify(config, null, 2)
-// )
-
 log.debug("AppConfig", CONFIG_FILE, JSON.stringify(config, null, 2))
 
 for (const account of config.accounts) {
@@ -132,14 +126,6 @@ router.post("/webhook",
   logWebhook(),
   WebhookController({ downloadAddedFiles, config, channels })
 )
-
-// router.get("/channels", async (ctx: Context) => {
-//   ctx.response.body = Array.from(channels)
-// })
-
-// router.get("/config", async (ctx: Context) => {
-//   ctx.response.body = appConfig
-// })
 
 app.use(router.routes())
 app.use(router.allowedMethods())
