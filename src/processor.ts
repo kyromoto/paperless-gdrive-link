@@ -54,6 +54,12 @@ export class Processor {
     public async start () {
 
         this.logger.info('Starting processor...')
+
+        process.on('SIGINT', this.handleShutdown.bind(this))
+        process.on('SIGTERM', this.handleShutdown.bind(this))
+        process.on('SIGHUP', this.handleShutdown.bind(this))
+        process.on('uncaughtException', this.handleShutdown.bind(this))
+        process.on('unhandledRejection', this.handleShutdown.bind(this))
         
         this.initChannelIds();
         await Promise.all(this.config.accounts.map(account => this.processExistingFiles(account)))
@@ -331,6 +337,26 @@ export class Processor {
             fileId: job.file.id,
             addParents: dst,
             removeParents: src
+        })
+
+    }
+
+
+
+    private async handleShutdown () {
+
+        await Promise.all(this.config.accounts.map(async account => {
+
+            this.logger.info(`${account.id}: Stopping push notification...`)
+
+            const drive = this.getDriveClient(account.id);
+            await drive.channels.stop({
+                requestBody: {
+                    id: this.accountChannelMap.get(account.id)!
+                }
+            })
+        })).catch(err => {
+            this.logger.error(`Failed to stop push notification: ${err.message}`, { error: err })
         })
 
     }
