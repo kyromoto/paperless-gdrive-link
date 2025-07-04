@@ -1,1 +1,1 @@
-# paperless-gdrive-link
+# paperless-gdrive-bridge

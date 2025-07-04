@@ -1,15 +1,24 @@
-FROM denoland/deno:2.1.4
+FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Cache-Verzeichnis für Deno
-ENV DENO_DIR=/app/cache
+COPY package*.json .
+COPY src src
 
-# Kopiere den Rest der Anwendung
-COPY . .
+RUN npm ci
+RUN npm run build
 
-# Cache dependencies based on deno.json and lock file
-RUN deno cache app/main.ts
 
-# Starte die Anwendung
-CMD ["task", "start"]
+
+FROM node:18-alpine AS production
+
+WORKDIR /app
+
+COPY package*.json .
+COPY --from=builder /app/build ./build
+
+RUN npm ci --only=production && npm cache clean --force
+
+ENV NODE_ENV=production
+
+CMD ["node", "build/main.js"]
