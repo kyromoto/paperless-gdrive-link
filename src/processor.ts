@@ -83,16 +83,14 @@ export class Processor {
 
         this.logger.info(`${account.id}: Setting up push notification...`) 
          
-        const driveAccount = this.getDriveAccount(account.id);
-        const fileId = this.getDriveSrcFolderId(account.id);
-        const channelId = crypto.randomUUID();
-        const webhookUrl = `${this.config.server.webhook_url}/webhook/${account.id}`;
-        
+        const driveAccount = this.getDriveAccount(account.id)
+        const fileId = this.getDriveSrcFolderId(account.id)
+        const channelId = crypto.randomUUID()
+        const webhookUrl = `${this.config.server.webhook_url}/webhook/${account.id}`
         const drive = this.getDriveClient(account.id);
         const expirationTimestapMS = Date.now() + (driveAccount.props.channel_expiration_sec * 1000)
 
-
-        const channel = await drive.files.watch({
+        await drive.files.watch({
             fileId,
             requestBody: {
                 id: channelId,
@@ -103,18 +101,30 @@ export class Processor {
             }
         })
 
+        this.accountChannelMap.set(account.id, channelId);
+
         const timer = setTimeout(async () => {
-            this.logger.info(`${account.id}: Refreshing push notification...`)
             clearTimeout(timer)
-            await this.setupPushNotification(account).catch(err => {
-                this.logger.error(`${account.id}: Refresh push notification failed: ${err.message || err}`, { error: err })
-                process.exit(1);
-            })
-        }, driveAccount.props.channel_expiration_sec * 0.1 * 1000)
+            await this.refreshPushNotification(account)
+        }, driveAccount.props.channel_expiration_sec * 0.9 * 1000)
+
+    }
+
+
+
+    private async refreshPushNotification(account: Account) {
+
+        this.logger.info(`${account.id}: Refreshing push notification...`)
+
+        const drive = this.getDriveClient(account.id);
+        const channelId = this.accountChannelMap.get(account.id)
+        if (!channelId) throw new Error('ChannelId not found')
+
+        await this.setupPushNotification(account)
 
         await drive.channels.stop({
             requestBody: {
-                id: channel.data.id
+                id: channelId
             }
         })
 
