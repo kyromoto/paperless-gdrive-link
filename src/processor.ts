@@ -1,7 +1,9 @@
 import * as crypto from "crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
 
 import { JWT } from "google-auth-library";
-import { google } from "googleapis";
+import { drive_v3, google } from "googleapis";
 import { getLogger } from "@logtape/logtape";
 import express, { Request, Response } from "express";
 import axios from "axios";
@@ -34,12 +36,6 @@ export interface Queue {
 
 
 
-
-
-const LABEL = 'processed';
-
-
-
 export class Processor {
 
     private readonly logger = getLogger()
@@ -60,8 +56,11 @@ export class Processor {
         process.on('SIGHUP', this.handleShutdown.bind(this))
         process.on('uncaughtException', this.handleShutdown.bind(this))
         process.on('unhandledRejection', this.handleShutdown.bind(this))
+
+        
         
         this.initChannelIds();
+        await Promise.all(this.config.accounts.map(account => this.initPageToken(account)))
         await Promise.all(this.config.accounts.map(account => this.processExistingFiles(account)))
         await Promise.all(this.config.accounts.map(account => this.setupPushNotification(account)));
         
@@ -81,6 +80,23 @@ export class Processor {
         for (const account of this.config.accounts) {
             this.accountChannelMap.set(account.id, crypto.randomUUID());
         }
+    }
+
+
+    private async initPageToken(account: Account) {
+
+        this.logger.info(`${account.id}: Initializing page token...`)
+
+        const drive = this.getDriveClient(account.id);
+        const res = await drive.changes.getStartPageToken({})
+        const token = res.data.startPageToken
+
+        if (!token) {
+            throw new Error(`Failed to get start page token for ${account.name}`)
+        }
+
+        await this.saveChangeToken(account.id, token)
+
     }
 
 
@@ -221,16 +237,44 @@ export class Processor {
 
         this.logger.info(`${accountId}: Getting unprocessed files ...`)
 
-        const drive = this.getDriveClient(accountId);
-        const folderId = this.getDriveSrcFolderId(accountId);
+        const drive = this.getDriveClient(accountId)
+        const folderId = this.getDriveSrcFolderId(accountId)
+        const changeToken = await this.getChangeToken(accountId).catch(err => {
+            this.logger.error(`Failed to get change token: ${err.message}`, { error: err })
+            return undefined
+        })
 
-        const getFilesRecursive = async (nextPageToken?: string) : Promise<DriveFile[]> => {
+        const listChangesRecursive = async (pageToken?: string): Promise<{ pageToken: string | undefined | null, changes: drive_v3.Schema$Change[] }> => {
+            
+            const res = await drive.changes.list({
+                spaces: 'drive',
+                includeRemoved: true,
+                pageSize: 100,
+                ...(pageToken && { pageToken })
+            })
+
+            const changes = res.data.changes || [];
+            const next = res.data.nextPageToken;
+
+            if (!next) return { changes, pageToken: res.data.newStartPageToken }
+
+            return {
+                pageToken: res.data.newStartPageToken,
+                changes: [
+                    ...changes,
+                    ...(await listChangesRecursive(next)).changes
+                ]
+            }
+        }
+
+        const listFilesRecursive = async (pageToken?: string) : Promise<DriveFile[]> => {
+            
             const res = await drive.files.list({
                 q: `'${folderId}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'`,
                 fields: 'nextPageToken, files(id, name, size, properties, mimeType, createdTime, modifiedTime)',
                 orderBy: "modifiedTime desc",
                 pageSize: 100,
-                ...(nextPageToken && { pageToken: nextPageToken })
+                ...(pageToken && { pageToken })
             })
 
             const curr = (res.data.files || []) as DriveFile[];
@@ -238,11 +282,22 @@ export class Processor {
             
             if (!next) return curr;
 
-            return curr.concat(await getFilesRecursive(next));
+            return curr.concat(await listFilesRecursive(next));
+
         }
 
-        const files = await getFilesRecursive();
-        const unprocessedFiles = files.filter(f => !f.labels?.[LABEL]);
+
+
+        const { changes, pageToken } = await listChangesRecursive(changeToken)
+        const files = await listFilesRecursive();
+
+        if (pageToken) {
+            await this.saveChangeToken(accountId, pageToken);
+        }
+
+        const unprocessedFiles = files.filter(file => {
+            return !! changes.find(change => change.fileId === file.id)
+        })
 
         return unprocessedFiles;
 
@@ -420,6 +475,25 @@ export class Processor {
 
         return driveAccount;
 
+    }
+
+
+    private async saveChangeToken (accountId: string, changeToken: string) {
+
+        this.logger.info(`${accountId}: Saving change token...`)
+
+        const filepath = path.join(this.config.server.data_path, `${accountId}.change-token.txt`)
+        await fs.writeFile(filepath, changeToken)
+    }
+
+    private async getChangeToken (accountId: string) {
+
+        this.logger.info(`${accountId}: Getting change token...`)
+
+        const filepath = path.join(this.config.server.data_path, `${accountId}.change-token.txt`)
+        const raw = await fs.readFile(filepath, "utf-8")
+        const token = raw.trim()
+        return token
     }
 
 }

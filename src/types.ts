@@ -3,7 +3,8 @@ import { z } from "zod";
 export type ServerConfig = z.infer<typeof ServerConfig>
 export const ServerConfig = z.object({
     port: z.number(),
-    webhook_url: z.string()
+    webhook_url: z.string(),
+    data_path: z.string()
 })
 
 
