@@ -5,6 +5,7 @@ import { setTimeout } from "node:timers/promises"
 import { drive_v3 } from "googleapis"
 import { getLogger } from "@logtape/logtape"
 
+import * as env from "./env"
 import { getDriveClient } from "./lib"
 import { Account, Config, DriveAccount } from "./types"
 
@@ -59,7 +60,7 @@ export class DriveMonitor {
             requestBody: {
                 id: channelId,
                 type: 'webhook',
-                address: `${this.config.server.webhook_url}/webhook`,
+                address: `${env.WEBHOOK_URL}/webhook`,
                 payload: true,
                 expiration: expirationTimestandMS.toString()
             }

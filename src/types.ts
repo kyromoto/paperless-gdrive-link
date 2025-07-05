@@ -2,14 +2,6 @@ import { z } from "zod"
 
 
 
-export type ServerConfig = z.infer<typeof ServerConfig>
-export const ServerConfig = z.object({
-    port: z.number(),
-    webhook_url: z.string(),
-    data_path: z.string()
-})
-
-
 export type DriveAccount = z.infer<typeof DriveAccount>
 export const DriveAccount = z.object({
     id: z.string().uuid(),
@@ -62,7 +54,6 @@ export const Account = z.object({
 
 export type Config = z.infer<typeof Config>
 export const Config = z.object({
-    server: ServerConfig,
     drive_accounts: z.array(DriveAccount),
     paperless_endpoints: z.array(PaperlessNgxEndpoint),
     accounts: z.array(Account)
