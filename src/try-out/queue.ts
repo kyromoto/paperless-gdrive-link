@@ -1,4 +1,6 @@
-import { getLogger, Logger } from "@logtape/logtape"
+import { getLogger } from "@logtape/logtape"
+
+
 
 export type QueueWorker<T> = (job: T) => Promise<void>
 

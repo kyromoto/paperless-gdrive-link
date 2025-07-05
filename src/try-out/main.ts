@@ -1,14 +1,12 @@
-import path from "node:path";
+import express from "express"
+import { configure, getConsoleSink, getLogger } from "@logtape/logtape"
 
-import express from "express";
-import { configure, getConsoleSink, getLogger } from "@logtape/logtape";
-
-import { ConfigFileRepository } from "./config";
-import { handleHealthCheck, handleWebhook } from "./controllers";
-import { FileProcessor } from "./file-processor";
-import { Queue, QueueWorker } from "./queue";
-import { DriveMonitor } from "./drive-monitor";
-import { FileQueueJob, fileQueueWorker, notificationQueueWorker } from "./worker";
+import { Queue } from "./queue"
+import { DriveMonitor } from "./drive-monitor"
+import { FileProcessor } from "./file-processor"
+import { ConfigFileRepository } from "./config"
+import { handleHealthCheck, handleWebhook } from "./controllers"
+import { FileQueueJob, fileQueueWorker, notificationQueueWorker } from "./worker"
 
 
 
@@ -24,8 +22,6 @@ const main = async () => {
     })
 
     const logger = getLogger()
-
-    // const dataPath = path.join(process.cwd(), "data")
     
     const config = await new ConfigFileRepository("config.json").read();
 
@@ -102,4 +98,3 @@ main().catch(error => {
     console.error('Failed to start application', error);
     process.exit(1);
 })
-

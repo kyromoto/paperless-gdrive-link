@@ -1,10 +1,11 @@
-import path from "node:path";
-import fs from "node:fs/promises";
+import path from "node:path"
+import fs from "node:fs/promises"
 
-import { drive_v3, google } from "googleapis";
+import { drive_v3, google } from "googleapis"
+import { JWT } from "google-auth-library"
 
-import { Account, DriveAccount } from "./types";
-import { JWT } from "google-auth-library";
+import { Account, DriveAccount } from "./types"
+
 
 
 

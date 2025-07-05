@@ -1,4 +1,6 @@
-import { z } from "zod";
+import { z } from "zod"
+
+
 
 export type ServerConfig = z.infer<typeof ServerConfig>
 export const ServerConfig = z.object({
