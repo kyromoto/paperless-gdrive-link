@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import { getLogger } from '@logtape/logtape'
 
 import { Config } from './types'
-import { ConfigRepository } from "./processor"
+import { ConfigRepository } from "../processor"
 
 
 

@@ -9,22 +9,14 @@ import express, { Request, Response } from "express";
 import axios from "axios";
 import FormData from "form-data";
 
-import { Account, Config } from "./types";
+import { Account, Config } from "./try-out/types";
 import { InMemoryQueue, JobProcessingError } from "./queue";
+import { DriveFile } from "./try-out/file-processor";
 
 
 
 export interface ConfigRepository {
     read: () => Promise<Config>
-}
-
-
-export interface DriveFile {
-    id: string;
-    name: string;
-    mimeType: string;
-    parents?: string[];
-    labels?: { [key: string]: string }
 }
 
 export type QueueJob = { owner: string, file: DriveFile }

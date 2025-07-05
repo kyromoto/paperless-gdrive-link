@@ -2,7 +2,7 @@ import "dotenv/config"
 
 import { configure, getConsoleSink } from "@logtape/logtape";
 
-import { ConfigFileRepository } from "./config";
+import { ConfigFileRepository } from "./try-out/config";
 import { Processor } from "./processor";
 
 
