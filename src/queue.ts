@@ -1,60 +1,56 @@
 import { getLogger } from "@logtape/logtape"
 
+type Task<T = any> = () => Promise<T>
 
 
-export type QueueWorker<T> = (job: T) => Promise<void>
+type QueueItem<T = any> = {
+    task: () => Promise<T>,
+    resolve: (value: T) => void
+    reject: (error: any) => void
+}
 
 
 
-export class Queue<T> {
+export class ConcurrentQueue {
 
-    private logger = getLogger().getChild(["queue", this.name])
+    private logger = getLogger().getChild(["concurrent-queue", this.name])
 
-    private readonly queue: Array<T> = []
-    private isProcessing = false
+    private runningTasks = 0
+    private queue: QueueItem[] = []
 
-    constructor (private readonly name: string, private readonly worker: QueueWorker<T>) {}
+    constructor(private readonly name: string, private readonly cocurrency: number = 1) {}
 
-    public enqueue (job: T) {
 
-        this.logger.debug(`Enqueuing job...`, { job })
-
-        this.queue.push(job)
-
-        if (!this.isProcessing) {
-            this.processQueue().catch(err => {
-                this.logger.error(`Failed to process queue: ${err.message}`, { error: err })
-            })
-        }
-
+    public async enqueue<T> (task: Task<T>) : Promise<T> {
+        return new Promise<T>((resolve, reject) => {
+            this.queue.push({ task, resolve, reject })
+            this.tryNext()
+        })
     }
 
 
 
-    private async processQueue () {
-
-        this.logger.debug(`Processing queue ... `, { length: this.queue.length })
-
-        if (this.isProcessing) return;
-        if (this.queue.length === 0) return;
-
-        this.isProcessing = true;
-
-        while (this.queue.length > 0) {
-
-            this.logger.info(`Remaining jobs: ${this.queue.length}`)
-
-            const job = this.queue.shift()
-
-            if (!job) continue
-
-            await this.worker(job).catch(err => {
-                this.logger.error(`Failed to process job: ${err.message || err}`, { job, error: err })
-            })
-
+    private tryNext () {
+        while (this.queue.length > 0 && this.runningTasks < this.cocurrency) {
+            this.doNext()
         }
+    }
 
-        this.isProcessing = false
+    private async doNext () {
+        
+        if (this.queue.length === 0) return
+        
+        const queueItem = this.queue.shift()!
+        this.runningTasks++
+
+        try {
+            queueItem.resolve(await queueItem.task())
+        } catch (error) {
+            queueItem.reject(error)
+        } finally {
+            this.runningTasks--
+            this.tryNext()
+        }
     }
 
 

@@ -3,11 +3,13 @@ import { Request, Response } from "express"
 
 import { DriveMonitor } from "./drive-monitor"
 import { Config } from "./types"
-import { Queue } from "./queue"
+import { ConcurrentQueue } from "./queue"
+import { FileProcessor } from "./file-processor"
+import { createFileTask, createNotificationTask } from "./lib"
 
 
 
-export const handleWebhook = (config: Config, queue: Queue<string>, monitors: Map<string, DriveMonitor>) => {
+export const handleWebhook = (config: Config, queue: ConcurrentQueue, monitors: Map<string, DriveMonitor>, processors: Map<string, FileProcessor>) => {
 
     const logger = getLogger().getChild("webhook-controller")
 
@@ -21,7 +23,6 @@ export const handleWebhook = (config: Config, queue: Queue<string>, monitors: Ma
             const state = req.get('X-Goog-Resource-State');
 
             const accountId = Array.from(monitors.entries()).find(([accountId, monitor]) => monitor.getChannelId() === channelId)?.[0]
-            const account = config.accounts.find(account => account.id === accountId)
 
             if (!channelId) {
                 throw new AcceptableWebhookError(`Received webhook without channel id ... ignoring`, 200, "OK")
@@ -31,15 +32,29 @@ export const handleWebhook = (config: Config, queue: Queue<string>, monitors: Ma
                 throw new AcceptableWebhookError(`Received webhook without state ... ignoring`, 200, "OK")
             }
 
+            const account = config.accounts.find(account => account.id === accountId)
             if (!account) {
                 throw new AcceptableWebhookError(`Received webhook for unknown channel id ... ignoring`, 200, "OK")
+            }
+
+            const processor = processors.get(account.id)
+            if (!processor) {
+                throw new AcceptableWebhookError(`Failed to find processor for ${account.name}`, 200, "OK")
             }
 
             if (state.toLowerCase() === 'sync') {
                 throw new AcceptableWebhookError(`Received sync webhook for account ${account.name}`, 200, "OK")
             }
 
-            queue.enqueue(account.id)
+            const result = queue.enqueue(createNotificationTask(getLogger().getChild(["notification-task", account.name]), processor))
+            
+            result.then(files => {
+                for (const file of files) {
+                    const taskLogger = getLogger().getChild(["file-task", account.name, file.name])
+                    const task = createFileTask(taskLogger, processor, file)
+                    queue.enqueue(task)
+                }
+            })
 
             res.status(200).send("OK")
 

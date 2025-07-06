@@ -42,7 +42,7 @@ export class DriveMonitor {
 
         this.driveAccount = driveAccount
         this.driveClient = getDriveClient(driveAccount)
-
+        
         this.eventEmitter.on("renew", this.start.bind(this))
     }
 
@@ -86,7 +86,7 @@ export class DriveMonitor {
 
     }
 
-    public async stop() {
+    public async stop(channelId?: string) {
 
         this.logger.info(`${this.account.name}: Stopping drive monitor...`)
 
@@ -99,12 +99,12 @@ export class DriveMonitor {
             throw new Error('Channel id not set')
         }
 
-        const channelId = this.channelId
+        const cid = channelId || this.channelId
         this.channelId = null
 
         await this.driveClient.channels.stop({
             requestBody: {
-                id: channelId
+                id: cid
             }
         }).catch(err => {
             this.logger.error(`Failed to stop channel with id ${channelId}: ${err.message}`, { error: err })

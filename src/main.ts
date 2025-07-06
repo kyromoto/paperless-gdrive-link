@@ -7,12 +7,12 @@ import express from "express"
 import { configure, getConsoleSink, getLogger } from "@logtape/logtape"
 
 import * as env from "./env"
-import { Queue } from "./queue"
 import { DriveMonitor } from "./drive-monitor"
 import { FileProcessor } from "./file-processor"
 import { ConfigFileRepository } from "./config"
 import { handleHealthCheck, handleWebhook } from "./controllers"
-import { FileQueueJob, fileQueueWorker, notificationQueueWorker } from "./worker"
+import { createFileTask } from "./lib"
+import { ConcurrentQueue } from "./queue"
 
 
 
@@ -41,15 +41,15 @@ const main = async () => {
     const monitors = new Map<string, DriveMonitor>()
     const processors = new Map<string, FileProcessor>()
 
-    const fileQueue: Queue<FileQueueJob> = new Queue("File-Queue", fileQueueWorker(config, processors))
-    const notificationQueue: Queue<string> = new Queue("Notification-Queue", notificationQueueWorker(config, fileQueue, processors))
+    const fileQueue = new ConcurrentQueue("File-Queue", env.CONCURRENCY)
+    const notificationQueue = new ConcurrentQueue("Notification-Queue", 1)
 
     const app = express();
 
     app.use(helmet())
     app.use(express.json());
     app.get("/health", handleHealthCheck())
-    app.post("/webhook", handleWebhook(config, notificationQueue, monitors))
+    app.post("/webhook", handleWebhook(config, notificationQueue, monitors, processors))
 
     await new Promise <void> ((resolve, reject) => {
         app.listen(env.PORT, err => {
@@ -82,8 +82,11 @@ const main = async () => {
             throw new Error(`Monitor not found for account ${account.id}`)
         }
 
-        const added = await processor.getUnprocessedFiles("all")
-        added.forEach(file => fileQueue.enqueue({ account, file }))
+
+        for (const file of await processor.getUnprocessedFiles("all")) {
+            const taskLogger = getLogger().getChild(["file-task", account.name])
+            fileQueue.enqueue(createFileTask(taskLogger, processor, file))
+        }
         
         await monitor.start()
 

@@ -6,6 +6,8 @@ import { JWT } from "google-auth-library"
 
 import * as env from "./env"
 import { Account, DriveAccount } from "./types"
+import { Logger } from "@logtape/logtape"
+import { DriveFile, FileProcessor } from "./file-processor"
 
 
 
@@ -132,4 +134,18 @@ export const getDriveClient = (drive: DriveAccount) => {
         })
     })
 
+}
+
+
+
+export const createNotificationTask = (logger: Logger, processor: FileProcessor) => async () => {
+    logger.info(`Getting unprocessed files...`)
+    return await processor.getUnprocessedFiles("changes")
+}
+
+
+
+export const createFileTask = (logger: Logger, processor: FileProcessor, file: DriveFile) => async () => {
+    logger.info(`Processing file ${file.name}...`, { file })
+    await processor.processFile(file)
 }

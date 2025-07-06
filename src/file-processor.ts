@@ -23,7 +23,6 @@ export class FileProcessor {
 
     private readonly logger = getLogger().getChild(["file-processor", this.account.name])
 
-    private driveAccount: DriveAccount
     private driveClient: drive_v3.Drive
 
     constructor (private readonly config: Config, private readonly account: Account) {
@@ -34,7 +33,6 @@ export class FileProcessor {
             throw new Error(`Failed to find drive account for ${this.account.name}`)
         }
 
-        this.driveAccount = driveAccount
         this.driveClient = getDriveClient(driveAccount)
 
     }
