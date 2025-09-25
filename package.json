@@ -13,12 +13,12 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "nodemon"
+    "dev": "CONFIG_PATH=config.json tsx watch src/main.ts"
   },
   "devDependencies": {
     "@types/express": "5.0",
-    "nodemon": "3.1",
-    "ts-node": "10.9",
+    "@types/node": "24.5",
+    "tsx": "4.20",
     "typescript": "5.8"
   },
   "dependencies": {
@@ -29,7 +29,7 @@
     "form-data": "4.0",
     "google-auth-library": "10.1",
     "googleapis": "150.0",
-    "helmet": "^8.1.0",
+    "helmet": "8.1",
     "zod": "3.25"
   }
 }

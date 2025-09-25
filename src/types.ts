@@ -1,6 +1,27 @@
 import { z } from "zod"
 
 
+export type Server = z.infer<typeof Server>
+export const Server = z.object({
+    data_path: z.string(),
+    http: z.object({
+        port: z.number().min(1024).default(3000)
+    }),
+    drive_monitor: z.object({
+        webhook_url: z.string().url(),    
+    }),
+    file_queue: z.object({
+       concurrency: z.number().min(1).default(5) 
+    }).default({}),
+    notification_queue: z.object({
+        concurrency: z.number().min(1).default(1)
+    }).default({}),
+    task_schedular: z.object({
+        interval_ms: z.number().min(1000).max(60 * 60 * 1000).default(5 * 1000),
+        concurrency: z.number().min(1).default(5)
+    }).default({})
+})
+
 
 export type DriveAccount = z.infer<typeof DriveAccount>
 export const DriveAccount = z.object({
@@ -25,8 +46,8 @@ export const DriveAccount = z.object({
 })
 
 
-export type PaperlessNgxEndpoint = z.infer<typeof PaperlessNgxEndpoint>
-export const PaperlessNgxEndpoint = z.object({
+export type PaperlessEndpoint = z.infer<typeof PaperlessEndpoint>
+export const PaperlessEndpoint = z.object({
     id: z.string().uuid(),
     name: z.string(),
     props: z.object({
@@ -54,7 +75,8 @@ export const Account = z.object({
 
 export type Config = z.infer<typeof Config>
 export const Config = z.object({
+    server: Server,
     drive_accounts: z.array(DriveAccount),
-    paperless_endpoints: z.array(PaperlessNgxEndpoint),
+    paperless_endpoints: z.array(PaperlessEndpoint),
     accounts: z.array(Account)
 })

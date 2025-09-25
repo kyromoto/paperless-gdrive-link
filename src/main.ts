@@ -13,6 +13,7 @@ import { ConfigFileRepository } from "./config"
 import { handleHealthCheck, handleWebhook } from "./controllers"
 import { createFileTask } from "./lib"
 import { ConcurrentQueue } from "./queue"
+import { makeTaskScheduler } from "./task-schedular"
 
 
 
@@ -31,18 +32,20 @@ const main = async () => {
     logger.info("Starting ...")
 
     Object.entries(env).forEach(([key, value]) => getLogger().getChild("env").info(`${key}=${value}`))
-    
-    await fs.access(env.DATA_PATH).catch(err => {
-        throw new Error(`Failed to access data path ${env.DATA_PATH}: ${err.message}`)
-    })
 
     const config = await new ConfigFileRepository(env.CONFIG_PATH).read();
+    
+    await fs.access(config.server.data_path).catch(err => {
+        throw new Error(`Failed to access data path ${config.server.data_path}: ${err.message}`)
+    })
+
+    const taskScheduler = makeTaskScheduler(config.server.task_schedular.interval_ms, config.server.task_schedular.concurrency)
 
     const monitors = new Map<string, DriveMonitor>()
     const processors = new Map<string, FileProcessor>()
 
-    const fileQueue = new ConcurrentQueue("File-Queue", env.CONCURRENCY)
-    const notificationQueue = new ConcurrentQueue("Notification-Queue", 1)
+    const fileQueue = new ConcurrentQueue("File-Queue", config.server.file_queue.concurrency)
+    const notificationQueue = new ConcurrentQueue("Notification-Queue", config.server.notification_queue.concurrency)
 
     const app = express();
 
@@ -52,21 +55,21 @@ const main = async () => {
     app.post("/webhook", handleWebhook(config, notificationQueue, monitors, processors))
 
     await new Promise <void> ((resolve, reject) => {
-        app.listen(env.PORT, err => {
+        app.listen(config.server.http.port, err => {
         
             if (err) {
                 logger.error(`Failed to start server: ${err.message}`, { error: err })
                 return reject(err)
             }
     
-            logger.info(`Server started on port ${env.PORT}`)
+            logger.info(`Server started on port ${config.server.http.port}`)
             return resolve()
         })
     })
 
     config.accounts.forEach(account => {
         processors.set(account.id, new FileProcessor(config, account))
-        monitors.set(account.id, new DriveMonitor(config, account))
+        monitors.set(account.id, new DriveMonitor(config, account, taskScheduler))
     })
 
     await Promise.all(config.accounts.map(async account => {

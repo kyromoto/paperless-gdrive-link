@@ -1,6 +1,5 @@
 import crypto from "node:crypto"
 import EventEmitter from "node:events"
-import { setTimeout } from "node:timers/promises"
 
 import { drive_v3 } from "googleapis"
 import { getLogger } from "@logtape/logtape"
@@ -8,6 +7,7 @@ import { getLogger } from "@logtape/logtape"
 import * as env from "./env"
 import { getDriveClient } from "./lib"
 import { Account, Config, DriveAccount } from "./types"
+import { Task, TaskScheduler, TimeoutMs } from "./task-schedular"
 
 
 
@@ -32,7 +32,8 @@ export class DriveMonitor {
 
     constructor(
         private readonly config: Config,
-        private readonly account: Account
+        private readonly account: Account,
+        private readonly taskScheduler: TaskScheduler
     ) {    
         const driveAccount = this.config.drive_accounts.find(drive => drive.id === this.account.props.drive_account_id)
 
@@ -60,27 +61,39 @@ export class DriveMonitor {
             requestBody: {
                 id: channelId,
                 type: 'webhook',
-                address: `${env.WEBHOOK_URL}/webhook`,
+                address: new URL("/webhook", this.config.server.drive_monitor.webhook_url).href,
                 payload: true,
                 expiration: expirationTimestandMS.toString()
             }
         })
 
         if (!channel.data.id) {
-            throw new Error('Failed to start channel')
+            throw new Error('Channel start failed: id not set')
         }
 
         if (!channel.data.expiration) {
-            throw new Error('Failed to start channel')
+            throw new Error('Channel start failed: expiration not set')
         }
+
+        this.logger.info(`Channel started`, { channel })
 
         this.channelId = channel.data.id
         this.channelExpirtation = Number.parseInt(channel.data.expiration)
         this.abortController = new AbortController()
 
-        setTimeout((this.channelExpirtation! - now) * 0.9, { signal: this.abortController.signal }).then(() => {
-            this.eventEmitter.emit("renew")
-        })
+        const renewOffset = 2 * 60 * 1000
+        const renewTimeMs = (this.channelExpirtation! - renewOffset)
+        const renewTask: Task = {
+            scheduledTime: new Date(renewTimeMs),
+            timeoutMS: renewOffset as TimeoutMs,
+            handler: async (taskId, logger) => {
+                this.eventEmitter.emit("renew")
+                return { status: "success" }
+            }
+        }
+
+        const { taskId, scheduledTime } = this.taskScheduler.registerTask(renewTask)
+        this.logger.info(`Channel renew task registered with id ${taskId} scheduled at ${scheduledTime.toUTCString()}`, { task: renewTask })
 
         this.eventEmitter.emit("started", this.channelId)
 
