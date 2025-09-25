@@ -100,7 +100,7 @@ export function makeTaskScheduler(intervalMs: number, maxConcurrentTasks: number
     }
 
 
-    const startScheduar = async () => {
+    const startSchedular = async () => {
         
         logger.info(`Starting task schedular...`)
 
@@ -122,7 +122,7 @@ export function makeTaskScheduler(intervalMs: number, maxConcurrentTasks: number
     }
 
 
-    startScheduar().catch(err => {
+    startSchedular().catch(err => {
         logger.error(`Schedular failed: ${err.message}`, { error: err })
         process.exit(1)
     })

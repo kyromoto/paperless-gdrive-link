@@ -4,7 +4,8 @@ import fs from "node:fs/promises"
 
 import helmet from "helmet"
 import express from "express"
-import { configure, getConsoleSink, getLogger } from "@logtape/logtape"
+import { configure, getConsoleSink, getLogger, defaultConsoleFormatter } from "@logtape/logtape"
+import { DEFAULT_REDACT_FIELDS, JWT_PATTERN, redactByField, redactByPattern } from "@logtape/redaction"
 
 import * as env from "./env"
 import { DriveMonitor } from "./drive-monitor"
@@ -20,9 +21,18 @@ import { makeTaskScheduler } from "./task-schedular"
 const main = async () => {
 
     await configure({
-        sinks: { console: getConsoleSink() },
+        sinks: {
+            console: redactByField(getConsoleSink({
+                formatter: redactByPattern(defaultConsoleFormatter, [
+                    JWT_PATTERN
+                ])
+            }), [
+                ...DEFAULT_REDACT_FIELDS,
+                "private_key"
+            ])
+        },
         loggers: [
-            { category: [], sinks: ["console"] },
+            { category: [], sinks: ["console"], lowestLevel: env.LOG_LEVEL },
             { category: ["logtape" ,"meta"], sinks: ["console"], lowestLevel: env.LOG_LEVEL }
         ]
     })
@@ -31,10 +41,11 @@ const main = async () => {
 
     logger.info("Starting ...")
 
-    Object.entries(env).forEach(([key, value]) => getLogger().getChild("env").info(`${key}=${value}`))
-
     const config = await new ConfigFileRepository(env.CONFIG_PATH).read();
-    
+
+    getLogger().getChild("env").info(Object.entries(env).reduce((obj, [key, value]) => Object.assign(obj, { [key]: value } ), {}))
+    getLogger().getChild("config").info(config)
+
     await fs.access(config.server.data_path).catch(err => {
         throw new Error(`Failed to access data path ${config.server.data_path}: ${err.message}`)
     })

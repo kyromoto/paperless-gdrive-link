@@ -22,7 +22,8 @@
     "typescript": "5.8"
   },
   "dependencies": {
-    "@logtape/logtape": "0.12",
+    "@logtape/logtape": "1.1",
+    "@logtape/redaction": "1.1",
     "axios": "1.10",
     "dotenv": "17.0",
     "express": "5.1",
