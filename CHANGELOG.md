@@ -1,3 +1,12 @@
+## [1.0.2](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.0.1...v1.0.2) (2025-09-25)
+
+
+### Bug Fixes
+
+* abort task-scheduler loop on any exit ([b40bf18](https://github.com/kyromoto/paperless-gdrive-link/commit/b40bf1804ea880a339223e2f68e96ab6c4bc428f))
+* deps ([85dcc30](https://github.com/kyromoto/paperless-gdrive-link/commit/85dcc30d452bccd92ed2f4a1ea43bd84c73c6c64))
+* main deps ([7ef96fd](https://github.com/kyromoto/paperless-gdrive-link/commit/7ef96fd75719b6283bb02aed1e806f52507444e9))
+
 ## [1.0.1](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.0.0...v1.0.1) (2025-09-25)
 
 
