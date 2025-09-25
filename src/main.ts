@@ -14,7 +14,7 @@ import { ConfigFileRepository } from "./config"
 import { handleHealthCheck, handleWebhook } from "./controllers"
 import { createFileTask } from "./lib"
 import { ConcurrentQueue } from "./queue"
-import { makeTaskScheduler } from "./task-schedular"
+import { makeTaskScheduler } from "./task-scheduler"
 
 
 
