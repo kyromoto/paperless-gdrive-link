@@ -16,6 +16,7 @@
     "dev": "CONFIG_PATH=config.json tsx watch src/main.ts"
   },
   "devDependencies": {
+    "@semantic-release/changelog": "6.0",
     "@semantic-release/git": "10.0",
     "@semantic-release/github": "11.0",
     "@types/express": "5.0",
@@ -27,7 +28,7 @@
   "dependencies": {
     "@logtape/logtape": "1.1",
     "@logtape/redaction": "1.1",
-    "axios": "1.10",
+    "axios": "1.12",
     "dotenv": "17.0",
     "express": "5.1",
     "form-data": "4.0",
