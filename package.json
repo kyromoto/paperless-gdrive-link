@@ -1,6 +1,6 @@
 {
   "name": "paperless-gdrive-bridge",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Use Google Drive as watchfolder for paperless-ngx",
   "license": "MIT",
   "keywords": [
@@ -12,7 +12,7 @@
     "email": "info@kyromoto.de"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf ./build && tsc",
     "dev": "CONFIG_PATH=config.json tsx watch src/main.ts"
   },
   "devDependencies": {
