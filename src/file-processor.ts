@@ -75,7 +75,7 @@ export class FileProcessor {
             }
 
             case "changes": {
-                const changes = await listChangesRecursive(this.account, this.driveClient)
+                const changes = await listChangesRecursive(this.config, this.account, this.driveClient)
                 const added = all.filter(file => changes.find(change => change.fileId === file.id))
                 return mapper(added)
             }
