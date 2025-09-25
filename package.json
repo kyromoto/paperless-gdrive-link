@@ -1,6 +1,6 @@
 {
   "name": "paperless-gdrive-link",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Use Google Drive as watchfolder for paperless-ngx",
   "license": "MIT",
   "keywords": [
