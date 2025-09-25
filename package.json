@@ -29,6 +29,7 @@
     "@logtape/logtape": "1.1",
     "@logtape/redaction": "1.1",
     "axios": "1.12",
+    "catch-exit": "2.0",
     "dotenv": "17.0",
     "express": "5.1",
     "form-data": "4.0",

@@ -2,6 +2,7 @@ import crypto from "node:crypto"
 import { setInterval } from "node:timers/promises"
 
 import { getLogger, Logger } from "@logtape/logtape"
+import { addExitCallback } from "catch-exit"
 
 export type TaskId = string & { __brand: "TaskId" }
 export type TimeoutMs = number & { __brand: "TimeoutMs" }
@@ -100,11 +101,19 @@ export function makeTaskScheduler(intervalMs: number, maxConcurrentTasks: number
     }
 
 
-    const startSchedular = async () => {
-        
-        logger.info(`Starting task schedular...`)
+    const startScheduler = async () => {
 
-        for await (const _ of setInterval(intervalMs)) {
+        const abortController = new AbortController()
+        
+        logger.info(`Starting task Scheduler...`)
+
+        addExitCallback(signal => {
+            logger.info(`Aborting task Scheduler loop...`, { signal })
+            abortController.abort()
+        })
+
+        for await (const _ of setInterval(intervalMs, { signal: abortController.signal })) {
+            
             if (runningTasks.size >= maxConcurrentTasks) return
 
             const now = new Date()
@@ -117,13 +126,15 @@ export function makeTaskScheduler(intervalMs: number, maxConcurrentTasks: number
 
             logger.debug(`Executing ${dueTasks.length} / ${scheduledTasks.size} tasks at ${now.toUTCString()}`, { dueTasks, now })
             dueTasks.forEach(taskId => executeTaskAsync(taskId))
+            
         }
+
+        logger.info(`Task Scheduler stopped`)
         
     }
 
-
-    startSchedular().catch(err => {
-        logger.error(`Schedular failed: ${err.message}`, { error: err })
+    startScheduler().catch(err => {
+        logger.error(`Scheduler failed: ${err.message}`, { error: err })
         process.exit(1)
     })
 
