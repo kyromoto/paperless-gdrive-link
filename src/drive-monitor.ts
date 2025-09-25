@@ -93,7 +93,7 @@ export class DriveMonitor {
         }
 
         const { taskId, scheduledTime } = this.taskScheduler.registerTask(renewTask)
-        this.logger.info(`Channel renew task registered: id ${taskId} | scheduled ${scheduledTime.toUTCString()}`, { task: renewTask })
+        this.logger.info(`Channel renew task registered: ${taskId} | ${scheduledTime.toUTCString()}`, { task: renewTask })
 
         this.eventEmitter.emit("started", this.channelId)
 
