@@ -16,8 +16,11 @@
     "dev": "CONFIG_PATH=config.json tsx watch src/main.ts"
   },
   "devDependencies": {
+    "@semantic-release/git": "10.0",
+    "@semantic-release/github": "11.0",
     "@types/express": "5.0",
     "@types/node": "24.5",
+    "semantic-release": "24.2",
     "tsx": "4.20",
     "typescript": "5.8"
   },
