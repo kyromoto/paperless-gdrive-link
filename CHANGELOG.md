@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.0.0...v1.0.1) (2025-09-25)
+
+
+### Bug Fixes
+
+* name in package.json ([6fe6bfd](https://github.com/kyromoto/paperless-gdrive-link/commit/6fe6bfda22f74136d9b5159f3dc4924f81787dbc))
+
 # 1.0.0 (2025-09-25)
 
 
