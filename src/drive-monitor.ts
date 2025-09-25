@@ -7,7 +7,7 @@ import { getLogger } from "@logtape/logtape"
 import * as env from "./env"
 import { getDriveClient } from "./lib"
 import { Account, Config, DriveAccount } from "./types"
-import { Task, TaskScheduler, TimeoutMs } from "./task-schedular"
+import { Task, TaskScheduler, TimeoutMs } from "./task-scheduler"
 
 
 
@@ -25,7 +25,7 @@ export class DriveMonitor {
     private driveClient: drive_v3.Drive
 
     private channelId: string | null | undefined = null
-    private channelExpirtation: number | null | undefined = null
+    private channelExpiration: number | null | undefined = null
     private abortController: AbortController | null | undefined = null
 
     private eventEmitter = new EventEmitter()
@@ -78,11 +78,11 @@ export class DriveMonitor {
         this.logger.info(`Channel started`, { channel })
 
         this.channelId = channel.data.id
-        this.channelExpirtation = Number.parseInt(channel.data.expiration)
+        this.channelExpiration = Number.parseInt(channel.data.expiration)
         this.abortController = new AbortController()
 
-        const renewOffset = 2 * 60 * 1000
-        const renewTimeMs = (this.channelExpirtation! - renewOffset)
+        const renewOffset = 30 * 1000
+        const renewTimeMs = (this.channelExpiration! - renewOffset)
         const renewTask: Task = {
             scheduledTime: new Date(renewTimeMs),
             timeoutMS: renewOffset as TimeoutMs,
@@ -93,7 +93,7 @@ export class DriveMonitor {
         }
 
         const { taskId, scheduledTime } = this.taskScheduler.registerTask(renewTask)
-        this.logger.info(`Channel renew task registered with id ${taskId} scheduled at ${scheduledTime.toUTCString()}`, { task: renewTask })
+        this.logger.info(`Channel renew task registered: id ${taskId} | scheduled ${scheduledTime.toUTCString()}`, { task: renewTask })
 
         this.eventEmitter.emit("started", this.channelId)
 
