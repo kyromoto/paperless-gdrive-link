@@ -1,5 +1,5 @@
 {
-  "name": "paperless-gdrive-bridge",
+  "name": "paperless-gdrive-link",
   "version": "1.0.0",
   "description": "Use Google Drive as watchfolder for paperless-ngx",
   "license": "MIT",
