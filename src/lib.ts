@@ -5,7 +5,7 @@ import { drive_v3, google } from "googleapis"
 import { JWT } from "google-auth-library"
 
 import * as env from "./env"
-import { Account, DriveAccount } from "./types"
+import { Account, Config, DriveAccount } from "./types"
 import { Logger } from "@logtape/logtape"
 import { DriveFile, FileProcessor } from "./file-processor"
 
@@ -39,9 +39,9 @@ export const listFilesRecursive = async (account: Account, drive: drive_v3.Drive
 
 
 
-export const listChangesRecursive = async (account: Account, drive: drive_v3.Drive) => {
+export const listChangesRecursive = async (config: Config, account: Account, drive: drive_v3.Drive) => {
 
-    const dataPath = path.normalize(env.DATA_PATH)
+    const dataPath = path.normalize(config.server.data_path)
     const token = await getChangeToken(account, dataPath).catch(async err => {
         const res = await drive.changes.getStartPageToken({})
 
