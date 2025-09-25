@@ -35,5 +35,8 @@
     "googleapis": "150.0",
     "helmet": "8.1",
     "zod": "3.25"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
