@@ -14,17 +14,26 @@ import { DriveFile, FileProcessor } from "./file-processor"
 
 export const listFilesRecursive = async (account: Account, drive: drive_v3.Drive) => {
 
-    const fn = async (pageToken?: string) : Promise<Array<drive_v3.Schema$File>> => {
+    const fn = async (folderId: string, pageToken?: string) : Promise<Array<drive_v3.Schema$File>> => {
 
         const res = await drive.files.list({
-            q: `'${account.props.drive_src_folder_id}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'`,
+            q: `'${folderId}' in parents and trashed = false`,
             fields: 'nextPageToken, files(id, name, size, properties, mimeType, createdTime, modifiedTime)',
             orderBy: "modifiedTime desc",
             pageSize: 100,
             ...(pageToken && { pageToken })
         })
 
-        const files = res.data.files || [];
+        const items = res.data.files || [];
+        
+        const files = items.filter(item => item.mimeType !== "application/vnd.google-apps.folder");
+        const folders = items.filter(item => item.mimeType === "application/vnd.google-apps.folder");
+
+        for (const folder of folders) {
+            if (!folder.id) continue
+            files.push(...await fn(folder.id))
+        }
+
         const next = res.data.nextPageToken;
 
         if (!next) return files;
@@ -33,7 +42,7 @@ export const listFilesRecursive = async (account: Account, drive: drive_v3.Drive
 
     }
 
-    return await fn()
+    return await fn(account.props.drive_src_folder_id)
 
 }
 
