@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.1.0...v1.1.1) (2025-09-26)
+
+
+### Reverts
+
+* Revert "feat: liste sub folders as well" ([fbf192a](https://github.com/kyromoto/paperless-gdrive-link/commit/fbf192abdcb712faebc198e006e562fb7f919cab))
+
 # [1.1.0](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.0.3...v1.1.0) (2025-09-26)
 
 
