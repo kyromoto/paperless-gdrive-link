@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.0.3...v1.1.0) (2025-09-26)
+
+
+### Features
+
+* liste sub folders as well ([9107933](https://github.com/kyromoto/paperless-gdrive-link/commit/9107933df0111bb34d972294afd3ba0a85f2191c))
+
 ## [1.0.3](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.0.2...v1.0.3) (2025-09-25)
 
 
