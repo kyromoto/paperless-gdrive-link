@@ -18,7 +18,7 @@ export class ConcurrentQueue {
     private runningTasks = 0
     private queue: QueueItem[] = []
 
-    constructor(private readonly name: string, private readonly cocurrency: number = 1) {}
+    constructor(private readonly name: string, private readonly concurrency: number = 1) {}
 
 
     public async enqueue<T> (task: Task<T>) : Promise<T> {
@@ -31,7 +31,7 @@ export class ConcurrentQueue {
 
 
     private tryNext () {
-        while (this.queue.length > 0 && this.runningTasks < this.cocurrency) {
+        while (this.queue.length > 0 && this.runningTasks < this.concurrency) {
             this.doNext()
         }
     }
