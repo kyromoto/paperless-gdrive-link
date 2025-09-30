@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.2.0...v1.2.1) (2025-09-30)
+
+
+### Bug Fixes
+
+* add more logging ([ffd2fb3](https://github.com/kyromoto/paperless-gdrive-link/commit/ffd2fb379a2c1cb947c7daa802f37f3341ccd222))
+
 # [1.2.0](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.1.1...v1.2.0) (2025-09-30)
 
 
