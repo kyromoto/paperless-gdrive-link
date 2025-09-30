@@ -100,9 +100,20 @@ export class FileProcessor {
 
         this.logger.info(`Processing file ${file.name}...`, { file })
         
-        await this.downloadFileFromDrive(file)
-        await this.uploadFileToPaperless(file)
-        await this.moveFile(file)
+        await this.downloadFileFromDrive(file).catch(err => {
+            this.logger.error(`Failed to download file ${file.name} from GDrive`, { err })
+            throw err
+        })
+
+        await this.uploadFileToPaperless(file).catch(err => {
+            this.logger.error(`Failed to upload file ${file.name} to Paperless`, { err })
+            throw err
+        })
+        
+        await this.moveFile(file).catch(err => {
+            this.logger.error(`Failed to move file ${file.name}`, { err })
+            throw err
+        })
 
     }
 
