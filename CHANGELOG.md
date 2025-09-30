@@ -1,3 +1,15 @@
+# [1.2.0](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.1.1...v1.2.0) (2025-09-30)
+
+
+### Bug Fixes
+
+* typo ([f466e06](https://github.com/kyromoto/paperless-gdrive-link/commit/f466e06366bb6b94bdf69c1b83049a3697f52f41))
+
+
+### Features
+
+* use redis with bull as message queues ([57bbb24](https://github.com/kyromoto/paperless-gdrive-link/commit/57bbb240e0e3fb1fca8bc51f5cef88bbbf126c81))
+
 ## [1.1.1](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.1.0...v1.1.1) (2025-09-26)
 
 
