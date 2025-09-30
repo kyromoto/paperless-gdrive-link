@@ -29,7 +29,6 @@ export class DriveMonitor {
 
     private channelId: string | null | undefined = null
     private channelExpiration: number | null | undefined = null
-    private abortController: AbortController | null | undefined = null
 
     private eventEmitter = new EventEmitter()
 
@@ -89,7 +88,6 @@ export class DriveMonitor {
 
         this.channelId = channel.data.id
         this.channelExpiration = Number.parseInt(channel.data.expiration)
-        this.abortController = new AbortController()
 
         const renewOffset = 30 * 1000
         const renewTimeMs = (this.channelExpiration! - renewOffset)
@@ -112,11 +110,6 @@ export class DriveMonitor {
     public async stop(channelId?: string) {
 
         this.logger.info(`Stopping ...`)
-
-        if (this.abortController) {
-            this.abortController.abort()
-            this.abortController = null
-        }
 
         if (!this.channelId) {
             throw new Error('Channel id not set')
