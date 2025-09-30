@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "rm -rf ./build && tsc",
-    "dev": "CONFIG_PATH=config.json tsx watch src/main.ts"
+    "dev": "tsx watch --env-file=.env src/main.ts"
   },
   "devDependencies": {
     "@semantic-release/changelog": "6.0",
@@ -29,6 +29,7 @@
     "@logtape/logtape": "1.1",
     "@logtape/redaction": "1.1",
     "axios": "1.12",
+    "bull": "4.16",
     "catch-exit": "2.0",
     "dotenv": "17.0",
     "express": "5.1",
@@ -36,6 +37,7 @@
     "google-auth-library": "10.1",
     "googleapis": "150.0",
     "helmet": "8.1",
+    "ioredis": "5.8",
     "zod": "3.25"
   },
   "engines": {

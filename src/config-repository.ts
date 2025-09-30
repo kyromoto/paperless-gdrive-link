@@ -19,9 +19,14 @@ export class ConfigFileRepository implements ConfigRepository {
 
         const data = await fs.readFile(this.path, 'utf-8')
         const json = JSON.parse(data)
-        const config = await Config.parseAsync(json)
+        const res = await Config.safeParseAsync(json)
 
-        return config
+        if (!res.success) {
+            throw new Error(`Failed to parse config: ${res.error.message}`)
+        }
+
+        return res.data
+        
     }
 
 

@@ -6,16 +6,20 @@ export const Server = z.object({
     data_path: z.string(),
     http: z.object({
         port: z.number().min(1024).default(3000)
+    }).default({}),
+    queue: z.object({
+        redis: z.object({
+            url: z.string().url(),
+            prefix: z.string().default("paperless-gdrive-link")
+        }),
+        concurrency: z.object({
+            collect: z.number().min(1).default(5),
+            process: z.number().min(1).default(1)
+        }).default({})
     }),
     drive_monitor: z.object({
         webhook_url: z.string().url(),    
     }),
-    file_queue: z.object({
-       concurrency: z.number().min(1).default(5) 
-    }).default({}),
-    notification_queue: z.object({
-        concurrency: z.number().min(1).default(1)
-    }).default({}),
     task_schedular: z.object({
         interval_ms: z.number().min(1000).max(60 * 60 * 1000).default(5 * 1000),
         concurrency: z.number().min(1).default(5)

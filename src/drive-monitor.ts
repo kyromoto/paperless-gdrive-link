@@ -4,16 +4,19 @@ import EventEmitter from "node:events"
 import { drive_v3 } from "googleapis"
 import { getLogger } from "@logtape/logtape"
 
-import * as env from "./env"
 import { getDriveClient } from "./lib"
 import { Account, Config, DriveAccount } from "./types"
 import { Task, TaskScheduler, TimeoutMs } from "./task-scheduler"
 
 
-
 export interface DriveMonitorEvents {
     started: (channelId: string) => void
     stopped: (channelId: string) => void
+}
+
+
+export type RenewChannelJobPayload = {
+
 }
 
 
@@ -50,20 +53,27 @@ export class DriveMonitor {
 
     public async start() {
 
-        this.logger.info(`Starting drive monitor...`)
+        this.logger.info(`Starting ...`)
 
         const now = Date.now()
-        const expirationTimestandMS = now + (this.driveAccount.props.channel_expiration_sec * 1000)
         const channelId = crypto.randomUUID()
-        
+        const channelAddress = new URL("/webhook", this.config.server.drive_monitor.webhook_url).href
+        const channleExpiration = now + (this.driveAccount.props.channel_expiration_sec * 1000)
+
+        this.logger.debug({
+            channelId,
+            channelAddress,
+            channleExpiration
+        })
+
         const channel = await this.driveClient.files.watch({
             fileId: this.account.props.drive_src_folder_id,
             requestBody: {
                 id: channelId,
                 type: 'webhook',
-                address: new URL("/webhook", this.config.server.drive_monitor.webhook_url).href,
+                address: channelAddress,
+                expiration: channleExpiration.toString(),
                 payload: true,
-                expiration: expirationTimestandMS.toString()
             }
         })
 
@@ -101,7 +111,7 @@ export class DriveMonitor {
 
     public async stop(channelId?: string) {
 
-        this.logger.info(`${this.account.name}: Stopping drive monitor...`)
+        this.logger.info(`Stopping ...`)
 
         if (this.abortController) {
             this.abortController.abort()

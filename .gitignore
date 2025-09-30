@@ -1,5 +1,7 @@
 .vscode
+.env*
 node_modules
 build
 data
-config.json
+config*.json
+docker-compose*

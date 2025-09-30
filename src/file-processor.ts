@@ -3,7 +3,8 @@ import FormData from "form-data"
 import { drive_v3 } from "googleapis"
 import { getLogger } from "@logtape/logtape"
 
-import { Account, Config, DriveAccount } from "./types"
+import { FileStore } from "./file-store"
+import { Account, Config } from "./types"
 import { getDriveClient, listChangesRecursive, listFilesRecursive } from "./lib"
 
 
@@ -18,6 +19,17 @@ export interface DriveFile {
 }
 
 
+export type CollectChangesJobPayload = {
+    accountId: string;
+}
+
+
+export type ProcessChangesJobPayload = {
+    accountId: string;
+    file: DriveFile
+}
+
+
 
 export class FileProcessor {
 
@@ -25,7 +37,7 @@ export class FileProcessor {
 
     private driveClient: drive_v3.Drive
 
-    constructor (private readonly config: Config, private readonly account: Account) {
+    constructor (private readonly config: Config, private readonly fileStore: FileStore, private readonly account: Account) {
 
         const driveAccount = this.config.drive_accounts.find(drive => drive.id === this.account.props.drive_account_id)
 
@@ -88,36 +100,29 @@ export class FileProcessor {
 
         this.logger.info(`Processing file ${file.name}...`, { file })
         
-        const content = await this.downloadFileContentFromDrive(file)
-        await this.uploadFileToPaperless(file, content)
+        await this.downloadFileFromDrive(file)
+        await this.uploadFileToPaperless(file)
         await this.moveFile(file)
 
     }
 
 
 
-    private async downloadFileContentFromDrive(file: DriveFile) : Promise<Buffer> {
+    private async downloadFileFromDrive(file: DriveFile) {
         
-        this.logger.info(`Downloading file ${file.name}...`, { file })
+        this.logger.info(`Downloading file ${file.name} from GDrive ...`, { file })
 
         const res = await this.driveClient.files.get({
             fileId: file.id,
             alt: 'media'
         }, { responseType: 'stream' });
 
-        const buffer = await new Promise<Buffer>((resolve, reject) => {
-            const chunks: Buffer[] = [];
-            res.data.on('data', (chunk: Buffer) => chunks.push(chunk));
-            res.data.on('end', () => resolve(Buffer.concat(chunks)));
-            res.data.on('error', (err: Error) => reject(err));
-        })
-
-        return buffer
+        await this.fileStore.upload(this.getFileStoreName(file), res.data)
 
     }
 
 
-    private async uploadFileToPaperless(file: DriveFile, content: Buffer) {
+    private async uploadFileToPaperless(file: DriveFile) {
 
         this.logger.info(`Uploading file ${file.name} to Paperless ...`, { file })
 
@@ -133,7 +138,9 @@ export class FileProcessor {
         const password = endpoint.props.credentials.password
         const authHeaderValue = `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`
 
-        form.append("document", content, { filename: file.name, contentType: file.mimeType });
+        const buffer = await this.fileStore.download(this.getFileStoreName(file), { deleteAfterWrite: true })
+        form.append("document", buffer, { filename: file.name, contentType: file.mimeType });
+        
 
         const res = await axios.request({
             method: 'post',
@@ -161,6 +168,11 @@ export class FileProcessor {
             removeParents: this.account.props.drive_src_folder_id
         })
 
+    }
+
+
+    private getFileStoreName(file: DriveFile) {
+        return `${this.account.id}_${file.id}`
     }
 
 

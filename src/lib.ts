@@ -1,10 +1,9 @@
-import path from "node:path"
 import fs from "node:fs/promises"
+import path from "node:path"
 
 import { drive_v3, google } from "googleapis"
 import { JWT } from "google-auth-library"
 
-import * as env from "./env"
 import { Account, Config, DriveAccount } from "./types"
 import { Logger } from "@logtape/logtape"
 import { DriveFile, FileProcessor } from "./file-processor"
@@ -41,8 +40,13 @@ export const listFilesRecursive = async (account: Account, drive: drive_v3.Drive
 
 export const listChangesRecursive = async (config: Config, account: Account, drive: drive_v3.Drive) => {
 
-    const dataPath = path.normalize(config.server.data_path)
-    const token = await getChangeToken(account, dataPath).catch(async err => {
+    const tokenPath = path.join(config.server.data_path, "tokens")
+
+    await fs.access(tokenPath, fs.constants.W_OK).catch(async err => {
+        await fs.mkdir(tokenPath, { recursive: true })
+    })
+
+    const token = await getChangeToken(account, tokenPath).catch(async err => {
         const res = await drive.changes.getStartPageToken({})
 
         if (!res.data.startPageToken) {
@@ -70,7 +74,7 @@ export const listChangesRecursive = async (config: Config, account: Account, dri
         }
 
         if (res.data.newStartPageToken) {
-            await setChangeToken(account, dataPath, res.data.newStartPageToken)
+            await setChangeToken(account, tokenPath, res.data.newStartPageToken)
         }
 
         return changes
@@ -82,14 +86,14 @@ export const listChangesRecursive = async (config: Config, account: Account, dri
 }
 
 
-export const getSrcFolderChangeTokenFilepath = (account: Account, dataPath: string) => {
-    return path.join(dataPath, `${account.id}.${account.props.drive_src_folder_id}.change-token.txt`)
+export const getSrcFolderChangeTokenFilepath = (account: Account, storePath: string) => {
+    return path.join(storePath, `${account.id}.${account.props.drive_src_folder_id}.change-token.txt`)
 }
 
 
-export const getChangeToken = async (account: Account, dataPath: string) => {
+export const getChangeToken = async (account: Account, storePath: string) => {
     
-    const filepath = getSrcFolderChangeTokenFilepath(account, dataPath)
+    const filepath = getSrcFolderChangeTokenFilepath(account, storePath)
     
     const raw = await fs.readFile(filepath, "utf-8")
     const token = raw.trim()
@@ -98,9 +102,9 @@ export const getChangeToken = async (account: Account, dataPath: string) => {
 
 
 
-export const setChangeToken = async (account: Account, dataPath: string, token: string) => {
+export const setChangeToken = async (account: Account, storePath: string, token: string) => {
 
-    const filepath = getSrcFolderChangeTokenFilepath(account, dataPath)
+    const filepath = getSrcFolderChangeTokenFilepath(account, storePath)
 
     await fs.writeFile(filepath, token, { encoding: "utf-8" })
 }
