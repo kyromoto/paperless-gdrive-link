@@ -23,11 +23,15 @@ export type CollectChangesJobPayload = {
     accountId: string;
 }
 
+export type CollectChangesJobResult = DriveFile[]
+
 
 export type ProcessChangesJobPayload = {
     accountId: string;
     file: DriveFile
 }
+
+export type ProcessChangesJobResult = void
 
 
 

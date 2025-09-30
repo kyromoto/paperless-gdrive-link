@@ -1,4 +1,4 @@
-import { Job } from "bull"
+import { Job } from "bullmq"
 import { CollectChangesJobPayload, FileProcessor, ProcessChangesJobPayload } from "./file-processor"
 import { Config } from "./types"
 import { Logger } from "@logtape/logtape"

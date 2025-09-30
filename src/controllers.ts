@@ -1,4 +1,4 @@
-import { Queue } from "bull"
+import bullmq from "bullmq"
 import { getLogger } from "@logtape/logtape"
 import { Request, Response } from "express"
 
@@ -9,7 +9,7 @@ import { FileProcessor, CollectChangesJobPayload } from "./file-processor"
 
 
 
-export const handleWebhook = (config: Config, queue: Queue<CollectChangesJobPayload>, monitors: Map<string, DriveMonitor>, processors: Map<string, FileProcessor>) => {
+export const handleWebhook = (config: Config, queue: bullmq.Queue<CollectChangesJobPayload>, monitors: Map<string, DriveMonitor>, processors: Map<string, FileProcessor>) => {
 
     const logger = getLogger().getChild("webhook-controller")
 
@@ -41,7 +41,7 @@ export const handleWebhook = (config: Config, queue: Queue<CollectChangesJobPayl
                 throw new AcceptableWebhookError(`${account.name}: Received sync webhook`, 200, "OK")
             }
 
-            await queue.add({ accountId: account.id }, {
+            await queue.add(queue.name, { accountId: account.id }, {
                 jobId: crypto.randomUUID(),
             })
 

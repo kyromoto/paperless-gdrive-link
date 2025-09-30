@@ -3,10 +3,10 @@ import "dotenv/config"
 import fs from "node:fs/promises"
 import path from "node:path"
 
-import bull from "bull"
+import * as bullmq from "bullmq"
 import helmet from "helmet"
 import express from "express"
-import Redis, { RedisOptions } from "ioredis"
+import IORedis, { RedisOptions} from "ioredis"
 import logtape from "@logtape/logtape"
 import { DEFAULT_REDACT_FIELDS, JWT_PATTERN, redactByField, redactByPattern } from "@logtape/redaction"
 
@@ -17,7 +17,7 @@ import { makeTaskScheduler } from "./task-scheduler"
 import { ConfigFileRepository } from "./config-repository"
 import { handleHealthCheck, handleWebhook } from "./controllers"
 import { makeCollectChangesQueueProcessor, makeProcessChangesQueueProcessor } from "./queue-processor"
-import { CollectChangesJobPayload, DriveFile, FileProcessor, ProcessChangesJobPayload } from "./file-processor"
+import { CollectChangesJobPayload, CollectChangesJobResult, DriveFile, FileProcessor, ProcessChangesJobPayload, ProcessChangesJobResult } from "./file-processor"
 
 
 
@@ -61,59 +61,54 @@ const main = async () => {
 
     await fileStore.init()
 
-    const redisOpts: bull.QueueOptions = (() => {
+    const redisOptions: RedisOptions = { maxRetriesPerRequest: null }
+    const redisConnection = new IORedis(config.server.queue.redis.url, redisOptions)
 
-        const options: RedisOptions = {
-            enableReadyCheck: false,
-            maxRetriesPerRequest: null
-        }
-
-        const client = new Redis(config.server.queue.redis.url)
-        const subscriber = new Redis(config.server.queue.redis.url, options)
-
-        return {
-            prefix: config.server.queue.redis.prefix,
-            createClient: type => {
-                switch (type) {
-                    case "client": return client
-                    case "subscriber": return subscriber
-                    default: return new Redis(config.server.queue.redis.url, options)
-                }
-            },
-            defaultJobOptions: {
-                jobId: crypto.randomUUID()
-            }
-        }
-
-    })()
-
-    const collectChangesQueue = new bull<CollectChangesJobPayload>("collect-changes", redisOpts)
-    const processChangesQueue = new bull<ProcessChangesJobPayload>("process-changes", redisOpts)
-
-    await collectChangesQueue.isReady().catch(err => {
-        logger.getChild(collectChangesQueue.name).error(`Start failed: ${err.message}`, { error: err })
-    })
-    logger.getChild(collectChangesQueue.name).info("started")
-
-    await processChangesQueue.isReady().catch(err => {
-        logger.getChild(processChangesQueue.name).error(`Start failed: ${err.message}`, { error: err })
-    })
-    logger.getChild(processChangesQueue.name).info("started")
-
-    collectChangesQueue.process(config.server.queue.concurrency.collect, makeCollectChangesQueueProcessor(logger.getChild(collectChangesQueue.name), config, processors))
-    processChangesQueue.process(config.server.queue.concurrency.process, makeProcessChangesQueueProcessor(logger.getChild(processChangesQueue.name), config, processors))
-
-    collectChangesQueue.on("active", job => {
-        logger.getChild([collectChangesQueue.name, job.id.toString()]).info(`${job.data.accountId} collecting changes started`, { job })
+    await new Promise<void>((resolve, reject) => {
+        redisConnection.once("ready", resolve)
+        redisConnection.once("error", reject)
+    }).catch(err => {
+        logger.getChild("redis").error(`Failed to connect at ${config.server.queue.redis.url}: ${err.message}`, { error: err })
     })
 
-    collectChangesQueue.on("completed", async (job, files: DriveFile[]) => {
-        logger.getChild([collectChangesQueue.name, job.id.toString()]).info(`${files.length} files collected`, { job, files })
-        await processChangesQueue.addBulk(files.map(file => ({ data: { accountId: job.data.accountId, file }, opts: { jobId: crypto.randomUUID() } })))
+    logger.getChild("redis").info(`Connected at ${config.server.queue.redis.url}`)
+
+    const queueOptions: bullmq.QueueOptions = {
+        connection: redisConnection,
+        prefix: config.server.queue.redis.prefix
+    }
+
+    const workerOptions: bullmq.WorkerOptions = {
+        connection: redisConnection,
+        prefix: config.server.queue.redis.prefix,
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 10 }
+    }
+
+    const collectChangesQueue = new bullmq.Queue<CollectChangesJobPayload, CollectChangesJobResult>("collect-changes", queueOptions)
+    const processChangesQueue = new bullmq.Queue<ProcessChangesJobPayload, ProcessChangesJobResult>("process-changes", queueOptions)
+    const collectChangesWorker = new bullmq.Worker(
+        collectChangesQueue.name,
+        makeCollectChangesQueueProcessor(logger.getChild(collectChangesQueue.name), config, processors),
+        { ...workerOptions, concurrency: config.server.queue.concurrency.collect }
+    )
+    const processChangesWorker = new bullmq.Worker(
+        processChangesQueue.name,
+        makeProcessChangesQueueProcessor(logger.getChild(processChangesQueue.name), config, processors),
+        { ...workerOptions, concurrency: config.server.queue.concurrency.process }
+    )
+
+    collectChangesWorker.on("active", job => {
+        logger.getChild([collectChangesQueue.name, job.id?.toString() || "unkown-id"]).info(`${job.data.accountId} collecting changes started`, { job })
     })
 
-    collectChangesQueue.on("failed", (job, error) => {
-        logger.getChild([collectChangesQueue.name, job.id.toString()]).error(`${job.data.accountId} collecting changes failed: ${error.message}`, { job, error })
+    collectChangesWorker.on("completed", async (job, files) => {
+        logger.getChild([collectChangesQueue.name, job.id?.toString() || "unkown-id"]).info(`${files.length} files collected`, { job, files })
+        await processChangesQueue.addBulk(files.map(file => ({ name: "process-changes", data: { accountId: job.data.accountId, file }, opts: { jobId: crypto.randomUUID() } })))
+    })
+
+    collectChangesWorker.on("failed", (job, error) => {
+        logger.getChild([collectChangesQueue.name, job?.id?.toString() || "unkown-id"]).error(`${job?.data.accountId || "unkown-account"} collecting changes failed: ${error.message}`, { job, error })
     })
 
     collectChangesQueue.on("error", error => {
@@ -121,16 +116,16 @@ const main = async () => {
     })
 
 
-    processChangesQueue.on("active", job => {
-        logger.getChild([processChangesQueue.name, job.id.toString()]).info(`${job.data.file.name} processing started`, { job })
+    processChangesWorker.on("active", job => {
+        logger.getChild([processChangesQueue.name, job.id?.toString() || "unkown-id"]).info(`${job.data.file.name} processing started`, { job })
     })
 
-    processChangesQueue.on("completed", (job, result) => {
-        logger.getChild([processChangesQueue.name, job.id.toString()]).info(`${job.data.file.name} processed`, { result })
+    processChangesWorker.on("completed", (job, result) => {
+        logger.getChild([processChangesQueue.name, job.id?.toString() || "unkown-id"]).info(`${job.data.file.name} processed`, { result })
     })
 
-    processChangesQueue.on("failed", (job, error) => {
-        logger.getChild([processChangesQueue.name, job.id.toString()]).error(`${job.data.file.name} processing failed: ${error.message}`, { error })
+    processChangesWorker.on("failed", (job, error) => {
+        logger.getChild([processChangesQueue.name, job?.id?.toString() || "unkown-id"]).error(`${job?.data.file.name || "unkown-file"} processing failed: ${error.message}`, { error })
     })
 
     processChangesQueue.on("error", error => {
@@ -158,7 +153,7 @@ const main = async () => {
         }
 
         const files = await processor.getUnprocessedFiles("all")
-        const jobs = files.map(file => ({ data: { accountId: account.id, file }, opts: { jobId: crypto.randomUUID() } }))
+        const jobs = files.map(file => ({ name: collectChangesQueue.name, data: { accountId: account.id, file }, opts: { jobId: crypto.randomUUID() } }))
         
         return processChangesQueue.addBulk(jobs)
 
@@ -168,10 +163,10 @@ const main = async () => {
         const log = logger.getChild("http-server")
         app.listen(config.server.http.port, err => {
             if (err) {
-                log.error(`Start failed: ${err.message}`, { error: err })
+                log.error(`Failed to start: ${err.message}`, { error: err })
                 return reject(err)
             } else {
-                log.info(`Start done: listening on port ${config.server.http.port}`)
+                log.info(`Listening on port ${config.server.http.port}`)
                 return resolve()
             }
         })

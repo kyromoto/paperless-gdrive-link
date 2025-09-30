@@ -29,7 +29,7 @@
     "@logtape/logtape": "1.1",
     "@logtape/redaction": "1.1",
     "axios": "1.12",
-    "bull": "4.16",
+    "bullmq": "^5.59.0",
     "catch-exit": "2.0",
     "dotenv": "17.0",
     "express": "5.1",
