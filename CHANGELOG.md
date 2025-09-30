@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.2.1...v1.3.0) (2025-09-30)
+
+
+### Features
+
+* replace bull by bullmq ([f89bc8c](https://github.com/kyromoto/paperless-gdrive-link/commit/f89bc8c4667a1aee78d4546626098c4abcb3bf5a))
+
 ## [1.2.1](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.2.0...v1.2.1) (2025-09-30)
 
 
