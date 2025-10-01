@@ -1,7 +1,7 @@
 import axios from "axios"
 import FormData from "form-data"
+import { Logger } from "@logtape/logtape"
 import { drive_v3 } from "googleapis"
-import { getLogger } from "@logtape/logtape"
 
 import { FileStore } from "./file-store"
 import { Account, Config } from "./types"
@@ -37,11 +37,14 @@ export type ProcessChangesJobResult = void
 
 export class FileProcessor {
 
-    private readonly logger = getLogger().getChild(["file-processor", this.account.name])
-
     private driveClient: drive_v3.Drive
 
-    constructor (private readonly config: Config, private readonly fileStore: FileStore, private readonly account: Account) {
+    constructor (
+        private readonly logger: Logger,
+        private readonly config: Config,
+        private readonly fileStore: FileStore,
+        private readonly account: Account
+    ) {
 
         const driveAccount = this.config.drive_accounts.find(drive => drive.id === this.account.props.drive_account_id)
 

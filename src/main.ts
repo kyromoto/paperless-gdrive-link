@@ -2,6 +2,7 @@ import "dotenv/config"
 
 import fs from "node:fs/promises"
 import path from "node:path"
+import http from "node:http"
 
 import * as bullmq from "bullmq"
 import helmet from "helmet"
@@ -18,10 +19,39 @@ import { ConfigFileRepository } from "./config-repository"
 import { handleHealthCheck, handleWebhook } from "./controllers"
 import { makeCollectChangesQueueProcessor, makeProcessChangesQueueProcessor } from "./queue-processor"
 import { CollectChangesJobPayload, CollectChangesJobResult, DriveFile, FileProcessor, ProcessChangesJobPayload, ProcessChangesJobResult } from "./file-processor"
+import { addExitCallback } from "catch-exit"
 
 
+type ProcessFileBulkJob = { name: string, data: ProcessChangesJobPayload, opts: bullmq.BulkJobOptions }
 
-const main = async () => {
+const ROOT_LOGGER_KEY = "app";
+
+
+(async () => {
+
+    const startTime = Date.now()
+
+    addExitCallback(async signal => {
+        
+        logger.info(`Shutting down... | Signal: ${signal}`, { signal })
+
+        logger.info("Stopping http server ...")
+        new Promise<void>((resolve, reject) => server.close(err => {
+            return err ? reject(err) : resolve()
+        })).catch(err => logger.error(`Failed to stop http server: ${err.message}`, { error: err }))
+
+        logger.info(`Quit redis connection ...`)
+        redisConnection.quit().catch(err => {
+            logger.error(`Failed to quit redis connection: ${err.message}`, { error: err })
+        })
+
+        logger.info(`Stopping monitors ...`)
+        Promise.all(Object.entries(monitors).map(([accountId, monitor]) => {
+            return monitor.stop()
+        }))
+
+        logger.info(`Goodbye!`)
+    })
 
     await logtape.configure({
         sinks: {
@@ -35,44 +65,61 @@ const main = async () => {
             ])
         },
         loggers: [
-            { category: [], sinks: ["console"], lowestLevel: env.LOG_LEVEL },
+            { category: [ROOT_LOGGER_KEY], sinks: ["console"], lowestLevel: env.LOG_LEVEL },
             { category: ["logtape" ,"meta"], sinks: ["console"], lowestLevel: env.LOG_LEVEL }
         ]
     })
 
-    const logger = logtape.getLogger()
-    const config = await new ConfigFileRepository(env.CONFIG_PATH).read().catch(err => {
-        logger.error(`Failed to read config from ${env.CONFIG_PATH}: ${err.message}`, { error: err })
-        process.exit(1)
-    })
+    const logger = logtape.getLogger(ROOT_LOGGER_KEY)
 
-    logger.getChild("env").info(Object.entries(env).reduce((obj, [key, value]) => Object.assign(obj, { [key]: value } ), {}))
-    logger.getChild("config").info(config)
 
+    logger.info("Loading env ...")
+    logger.info(Object.entries(env).reduce((obj, [key, value]) => Object.assign(obj, { [key]: value } ), {}))
+    
+    logger.info("Loading config ...")
+    const config = await new ConfigFileRepository(logger.getChild("config-repository"), env.CONFIG_PATH).read()
+    logger.debug(config)
+
+
+
+    logger.info("Check data path exists ...")
     await fs.access(config.server.data_path).catch(async err => {
         logger.warn(`Data path ${config.server.data_path} does not exist, creating...`)
         await fs.mkdir(config.server.data_path, { recursive: true })
     })
 
+
+
+    logger.info("Initializing file store ...")
     const fileStore = new FileStore(path.join(config.server.data_path, "files"))
-    const taskScheduler = makeTaskScheduler(config.server.task_schedular.interval_ms, config.server.task_schedular.concurrency)
+    await fileStore.init()
+
+
+
+    logger.info("Initializing task scheduler ...")
+    const taskScheduler = makeTaskScheduler(logger.getChild("task-scheduler"), {
+        intervalMs: config.server.task_schedular.interval_ms,
+        maxConcurrentTasks: config.server.task_schedular.concurrency
+    })
+    
     const monitors = new Map<string, DriveMonitor>()
     const processors = new Map<string, FileProcessor>()
 
-    await fileStore.init()
+
+
+    logger.info(`Connecting to redis at ${config.server.queue.redis.url} ...`)
 
     const redisOptions: RedisOptions = { maxRetriesPerRequest: null }
     const redisConnection = new IORedis(config.server.queue.redis.url, redisOptions)
-
+    
     await new Promise<void>((resolve, reject) => {
         redisConnection.once("ready", resolve)
         redisConnection.once("error", reject)
-    }).catch(err => {
-        logger.getChild("redis").error(`Failed to connect at ${config.server.queue.redis.url}: ${err.message}`, { error: err })
     })
 
-    logger.getChild("redis").info(`Connected at ${config.server.queue.redis.url}`)
 
+
+    logger.info("Initializing queues ...")
     const queueOptions: bullmq.QueueOptions = {
         connection: redisConnection,
         prefix: config.server.queue.redis.prefix
@@ -132,76 +179,54 @@ const main = async () => {
         logger.getChild(processChangesQueue.name).error(`queue error: ${error.message}`, { error })
     })
 
-    const app = express();
+
+    
+    logger.info("Initializing file processors ...")
+    config.accounts.forEach(account => processors.set(account.id, new FileProcessor(logger.getChild(["file-processor", account.name]), config, fileStore, account)))
+    
+    logger.info("Initializing drive monitors ...")
+    config.accounts.forEach(account => monitors.set(account.id, new DriveMonitor(logger.getChild(["drive-monitor", account.name]), config, account, taskScheduler)))
+
+
+
+    logger.info("Collect outstanding files from watchfolders ...")
+    const processingJobs = (await Promise.all(Array
+        .from(processors.entries())
+        .map<Promise<ProcessFileBulkJob[]>>(async ([accountId, processor]) => {
+            const files = await processor.getUnprocessedFiles("all")
+            return files.map<ProcessFileBulkJob>(file => ({
+                name: collectChangesQueue.name,
+                data: { accountId, file },
+                opts: { jobId: crypto.randomUUID() }
+            }))
+        }))).flat()
+
+    logger.info(`Queue ${processingJobs.length} outstanding files for processing ...`, { processingJobs })
+    await processChangesQueue.addBulk(processingJobs)
+
+
+
+    logger.info(`Starting http server at port ${config.server.http.port}...`)
+    const app = express()
 
     app.use(helmet())
     app.use(express.json());
     app.get("/health", handleHealthCheck())
-    app.post("/webhook", handleWebhook(config, collectChangesQueue, monitors, processors))
+    app.post("/webhook", handleWebhook(logger.getChild("webhook-controller"), config, collectChangesQueue, monitors, processors))
 
-    config.accounts.forEach(account => {
-        processors.set(account.id, new FileProcessor(config, fileStore, account))
-        monitors.set(account.id, new DriveMonitor(config, account, taskScheduler))
-    })
-
-    await Promise.all(config.accounts.map(async account => {
-        
-        const processor = processors.get(account.id)
-
-        if (!processor) {
-            throw new Error(`Processor not found for account ${account.id}`)
-        }
-
-        const files = await processor.getUnprocessedFiles("all")
-        const jobs = files.map(file => ({ name: collectChangesQueue.name, data: { accountId: account.id, file }, opts: { jobId: crypto.randomUUID() } }))
-        
-        return processChangesQueue.addBulk(jobs)
-
-    }))
-
-    await new Promise<void>((resolve, reject) => {
-        const log = logger.getChild("http-server")
-        app.listen(config.server.http.port, err => {
-            if (err) {
-                log.error(`Failed to start: ${err.message}`, { error: err })
-                return reject(err)
-            } else {
-                log.info(`Listening on port ${config.server.http.port}`)
-                return resolve()
-            }
+    const server = await new Promise<http.Server>((resolve, reject) => {
+        const server = app.listen(config.server.http.port, err => {
+            err ? reject(err) : resolve(server)
         })
     })
 
-    await Promise.all(config.accounts.map(async account => {
 
-        const monitor = monitors.get(account.id)
 
-        if (!monitor) {
-            throw new Error(`Monitor not found for account ${account.id}`)
-        }
+    logger.info("Starting drive monitors ...")
+    await Promise.all(Array.from(monitors.values()).map(monitor => monitor.start()))
 
-        return monitor.start()
 
-    }))
 
-    const handleShutdown = async () => {
-        for (const [accountId, monitor] of monitors.entries()) {
-            await monitor.stop().catch(err => {
-                const account = config.accounts.find(account => account.id === accountId)!
-                logger.error(`${account.name}: Failed to stop drive monitor: ${err.message}`, { error: err })
-            })
-        }
-    }
+    logger.info(`Application started in ${(Date.now() - startTime) / 1000} seconds`)
 
-    process.on("SIGINT", async () => await handleShutdown())
-    process.on("SIGTERM", async () => await handleShutdown())
-    process.on("SIGHUP", async () => await handleShutdown())
-
-    logger.info("Application started :-)")
-
-}
-
-main().catch(error => {
-    console.error('Failed to start application', error);
-    process.exit(1);
-})
+})()

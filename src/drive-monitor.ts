@@ -2,11 +2,12 @@ import crypto from "node:crypto"
 import EventEmitter from "node:events"
 
 import { drive_v3 } from "googleapis"
-import { getLogger } from "@logtape/logtape"
+import { Logger } from "@logtape/logtape"
 
 import { getDriveClient } from "./lib"
 import { Account, Config, DriveAccount } from "./types"
 import { Task, TaskScheduler, TimeoutMs } from "./task-scheduler"
+import { Queue } from "bullmq"
 
 
 export interface DriveMonitorEvents {
@@ -22,8 +23,6 @@ export type RenewChannelJobPayload = {
 
 export class DriveMonitor {
 
-    private readonly logger = getLogger().getChild(["drive-monitor", this.account.name])
-
     private driveAccount: DriveAccount
     private driveClient: drive_v3.Drive
 
@@ -33,6 +32,7 @@ export class DriveMonitor {
     private eventEmitter = new EventEmitter()
 
     constructor(
+        private readonly logger: Logger,
         private readonly config: Config,
         private readonly account: Account,
         private readonly taskScheduler: TaskScheduler

@@ -27,9 +27,9 @@ export interface TaskScheduler {
 
 
 
-export function makeTaskScheduler(intervalMs: number, maxConcurrentTasks: number): TaskScheduler {
-    
-    const logger = getLogger().getChild(["task-scheduler"])
+export function makeTaskScheduler(logger: Logger, params: { intervalMs: number, maxConcurrentTasks: number }): TaskScheduler {
+
+    const { intervalMs, maxConcurrentTasks } = params
 
     const scheduledTasks = new Map<TaskId, Task>()
     const runningTasks = new Set<TaskId>()

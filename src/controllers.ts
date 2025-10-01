@@ -1,5 +1,5 @@
 import bullmq from "bullmq"
-import { getLogger } from "@logtape/logtape"
+import { Logger } from "@logtape/logtape"
 import { Request, Response } from "express"
 
 import { Config } from "./types"
@@ -9,9 +9,7 @@ import { FileProcessor, CollectChangesJobPayload } from "./file-processor"
 
 
 
-export const handleWebhook = (config: Config, queue: bullmq.Queue<CollectChangesJobPayload>, monitors: Map<string, DriveMonitor>, processors: Map<string, FileProcessor>) => {
-
-    const logger = getLogger().getChild("webhook-controller")
+export const handleWebhook = (logger: Logger, config: Config, queue: bullmq.Queue<CollectChangesJobPayload>, monitors: Map<string, DriveMonitor>, processors: Map<string, FileProcessor>) => {
 
     return async (req: Request, res: Response) => {
 
@@ -68,11 +66,9 @@ export const handleWebhook = (config: Config, queue: bullmq.Queue<CollectChanges
 
 
 export const handleHealthCheck = () => {
-
     return async (req: Request, res: Response) => {
         res.status(200).json({ status: "OK" });
     }
-
 }
 
 
