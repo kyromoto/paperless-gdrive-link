@@ -7,8 +7,9 @@ import http from "node:http"
 import * as bullmq from "bullmq"
 import helmet from "helmet"
 import express from "express"
-import IORedis, { RedisOptions} from "ioredis"
 import logtape from "@logtape/logtape"
+import { err, ok, Result } from "neverthrow"
+import IORedis, { RedisOptions } from "ioredis"
 import { DEFAULT_REDACT_FIELDS, JWT_PATTERN, redactByField, redactByPattern } from "@logtape/redaction"
 
 import * as env from "./env"
@@ -20,6 +21,7 @@ import { handleHealthCheck, handleWebhook } from "./controllers"
 import { makeCollectChangesQueueProcessor, makeProcessChangesQueueProcessor } from "./queue-processor"
 import { CollectChangesJobPayload, CollectChangesJobResult, DriveFile, FileProcessor, ProcessChangesJobPayload, ProcessChangesJobResult } from "./file-processor"
 import { addExitCallback } from "catch-exit"
+import { getDriveClient } from "./lib"
 
 
 type ProcessFileBulkJob = { name: string, data: ProcessChangesJobPayload, opts: bullmq.BulkJobOptions }
@@ -179,13 +181,45 @@ const ROOT_LOGGER_KEY = "app";
         logger.getChild(processChangesQueue.name).error(`queue error: ${error.message}`, { error })
     })
 
-
     
     logger.info("Initializing file processors ...")
-    config.accounts.forEach(account => processors.set(account.id, new FileProcessor(logger.getChild(["file-processor", account.name]), config, fileStore, account)))
+    
+    const initProcessorsResult = Result.combineWithAllErrors(config.accounts.map(account => {
+        const driveAccount = config.drive_accounts.find(drive => drive.id === account.props.drive_account_id)
+        
+        if (!driveAccount) {
+            return err({
+                accountId: account.id,
+                message: `Failed to find drive account for ${account.name}`
+            })
+        }
+
+        processors.set(account.id, new FileProcessor(
+            logger.getChild(["file-processor", account.name]),
+            config,
+            fileStore,
+            account,
+            getDriveClient(driveAccount)
+        ))
+        
+        return ok()
+        
+    }))
+
+    if (initProcessorsResult.isErr()) {
+        initProcessorsResult.error.forEach(error => {
+            logger.error(error.message, { error })
+        })
+        throw new Error("Failed to initialize drive clients")
+    }
     
     logger.info("Initializing drive monitors ...")
-    config.accounts.forEach(account => monitors.set(account.id, new DriveMonitor(logger.getChild(["drive-monitor", account.name]), config, account, taskScheduler)))
+    config.accounts.forEach(account => monitors.set(account.id, new DriveMonitor(
+        logger.getChild(["drive-monitor", account.name]),
+        config,
+        account,
+        taskScheduler
+    )))
 
 
 

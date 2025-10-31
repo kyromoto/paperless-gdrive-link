@@ -37,24 +37,13 @@ export type ProcessChangesJobResult = void
 
 export class FileProcessor {
 
-    private driveClient: drive_v3.Drive
-
     constructor (
         private readonly logger: Logger,
         private readonly config: Config,
         private readonly fileStore: FileStore,
-        private readonly account: Account
-    ) {
-
-        const driveAccount = this.config.drive_accounts.find(drive => drive.id === this.account.props.drive_account_id)
-
-        if (!driveAccount) {
-            throw new Error(`Failed to find drive account for ${this.account.name}`)
-        }
-
-        this.driveClient = getDriveClient(driveAccount)
-
-    }
+        private readonly account: Account,
+        private readonly driveClient: drive_v3.Drive
+    ) {}
 
 
 
