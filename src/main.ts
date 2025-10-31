@@ -33,6 +33,8 @@ const ROOT_LOGGER_KEY = "app";
 
     const startTime = Date.now()
 
+    console.info(`App version: ${process.env.npm_package_version}`)
+
     addExitCallback(async signal => {
         
         logger.info(`Shutting down... | Signal: ${signal}`, { signal })
@@ -73,7 +75,6 @@ const ROOT_LOGGER_KEY = "app";
     })
 
     const logger = logtape.getLogger(ROOT_LOGGER_KEY)
-
 
     logger.info("Loading env ...")
     logger.info(Object.entries(env).reduce((obj, [key, value]) => Object.assign(obj, { [key]: value } ), {}))
