@@ -1,3 +1,10 @@
+## [1.4.1](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.4.0...v1.4.1) (2025-10-31)
+
+
+### Bug Fixes
+
+* refactored processor initalization ([a3bc2da](https://github.com/kyromoto/paperless-gdrive-link/commit/a3bc2da6e67fc2539dce10cf6645c913291e6f7a))
+
 # [1.4.0](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.3.0...v1.4.0) (2025-10-01)
 
 
