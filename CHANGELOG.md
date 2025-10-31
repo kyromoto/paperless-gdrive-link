@@ -1,3 +1,10 @@
+## [1.4.2](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.4.1...v1.4.2) (2025-10-31)
+
+
+### Bug Fixes
+
+* log app version on startup ([eb80a4d](https://github.com/kyromoto/paperless-gdrive-link/commit/eb80a4d32491fa4e1af1718e590da242f4e28ac4))
+
 ## [1.4.1](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.4.0...v1.4.1) (2025-10-31)
 
 
