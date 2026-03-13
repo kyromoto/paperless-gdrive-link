@@ -28,8 +28,8 @@
   "dependencies": {
     "@logtape/logtape": "1.1",
     "@logtape/redaction": "1.1",
-    "axios": "1.12",
-    "bullmq": "^5.59.0",
+    "axios": "1.13",
+    "bullmq": "5.59",
     "catch-exit": "2.0",
     "dotenv": "17.0",
     "express": "5.1",
@@ -39,6 +39,7 @@
     "helmet": "8.1",
     "ioredis": "5.8",
     "neverthrow": "8.2",
+    "yaml": "2.8",
     "zod": "3.25"
   },
   "engines": {
