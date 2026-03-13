@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 
+import * as yml from "yaml";
 import { getLogger, Logger } from '@logtape/logtape'
 
 import { Config } from './types'
@@ -18,9 +19,9 @@ export class ConfigFileRepository implements ConfigRepository {
 
         this.logger.debug(`Reading config from ${this.path}`)
 
-        const data = await fs.readFile(this.path, 'utf-8')
-        const json = JSON.parse(data)
-        const res = await Config.safeParseAsync(json)
+        const raw = await fs.readFile(this.path, 'utf-8')
+        const data = yml.parse(raw)
+        const res = await Config.safeParseAsync(data)
 
         if (!res.success) {
             throw new Error(`Failed to parse config: ${res.error.message}`)
@@ -35,7 +36,7 @@ export class ConfigFileRepository implements ConfigRepository {
 
         this.logger.debug(`Writing config to ${this.path}`)
 
-        const json = JSON.stringify(config, null, 2)
-        await fs.writeFile(this.path, json)
+        const raw = yml.stringify(config)
+        await fs.writeFile(this.path, raw)
     }
 }
