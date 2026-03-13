@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.4.3...v1.5.0) (2026-03-13)
+
+
+### Features
+
+* use yaml config ([6a3da0a](https://github.com/kyromoto/paperless-gdrive-link/commit/6a3da0aad43e76e1ea026e5988f55d7eb79a2be2))
+
 ## [1.4.3](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.4.2...v1.4.3) (2026-03-13)
 
 
