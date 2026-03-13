@@ -1,3 +1,10 @@
+## [1.4.3](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.4.2...v1.4.3) (2026-03-13)
+
+
+### Bug Fixes
+
+* lift depdencies versions because of vulnerabilities ([b5c00b3](https://github.com/kyromoto/paperless-gdrive-link/commit/b5c00b33b8da2bcff734ba72a9e43023c38e2e18))
+
 ## [1.4.2](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.4.1...v1.4.2) (2025-10-31)
 
 
