@@ -1,3 +1,10 @@
+## [1.5.1](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.5.0...v1.5.1) (2026-03-16)
+
+
+### Bug Fixes
+
+* use biome ([4dbf3ae](https://github.com/kyromoto/paperless-gdrive-link/commit/4dbf3aee261d85ae1e059825883259baec693b5f))
+
 # [1.5.0](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.4.3...v1.5.0) (2026-03-13)
 
 
