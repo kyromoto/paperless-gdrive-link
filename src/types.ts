@@ -1,86 +1,94 @@
-import { z } from "zod"
+import { z } from "zod";
 
-
-export type Server = z.infer<typeof Server>
+export type Server = z.infer<typeof Server>;
 export const Server = z.object({
-    data_path: z.string(),
-    http: z.object({
-        port: z.number().min(1024).default(3000)
-    }).default({}),
-    queue: z.object({
-        redis: z.object({
-            url: z.string().url(),
-            prefix: z.string().default("paperless-gdrive-link")
-        }),
-        concurrency: z.object({
-            collect: z.number().min(1).default(5),
-            process: z.number().min(1).default(1)
-        }).default({})
-    }),
-    drive_monitor: z.object({
-        webhook_url: z.string().url(),    
-    }),
-    task_schedular: z.object({
-        interval_ms: z.number().min(1000).max(60 * 60 * 1000).default(5 * 1000),
-        concurrency: z.number().min(1).default(5)
-    }).default({})
-})
+	data_path: z.string(),
+	http: z
+		.object({
+			port: z.number().min(1024).default(3000),
+		})
+		.default({}),
+	queue: z.object({
+		redis: z.object({
+			url: z.string().url(),
+			prefix: z.string().default("paperless-gdrive-link"),
+		}),
+		concurrency: z
+			.object({
+				collect: z.number().min(1).default(5),
+				process: z.number().min(1).default(1),
+			})
+			.default({}),
+	}),
+	drive_monitor: z.object({
+		webhook_url: z.string().url(),
+	}),
+	task_schedular: z
+		.object({
+			interval_ms: z
+				.number()
+				.min(1000)
+				.max(60 * 60 * 1000)
+				.default(5 * 1000),
+			concurrency: z.number().min(1).default(5),
+		})
+		.default({}),
+});
 
-
-export type DriveAccount = z.infer<typeof DriveAccount>
+export type DriveAccount = z.infer<typeof DriveAccount>;
 export const DriveAccount = z.object({
-    id: z.string().uuid(),
-    name: z.string(),
-    props: z.object({
-        change_token: z.string().optional(),
-        channel_expiration_sec: z.number().min(60).default(5 * 60),
-        credentials: z.object({
-            type: z.literal("service_account"),
-            project_id: z.string(),
-            private_key_id: z.string(),
-            private_key: z.string(),
-            client_email: z.string(),
-            client_id: z.string(),
-            auth_uri: z.string(),
-            token_uri: z.string(),
-            auth_provider_x509_cert_url: z.string(),
-            universe_domain: z.string()
-        })
-    })
-})
+	id: z.string().uuid(),
+	name: z.string(),
+	props: z.object({
+		change_token: z.string().optional(),
+		channel_expiration_sec: z
+			.number()
+			.min(60)
+			.default(5 * 60),
+		credentials: z.object({
+			type: z.literal("service_account"),
+			project_id: z.string(),
+			private_key_id: z.string(),
+			private_key: z.string(),
+			client_email: z.string(),
+			client_id: z.string(),
+			auth_uri: z.string(),
+			token_uri: z.string(),
+			auth_provider_x509_cert_url: z.string(),
+			universe_domain: z.string(),
+		}),
+	}),
+});
 
-
-export type PaperlessEndpoint = z.infer<typeof PaperlessEndpoint>
+export type PaperlessEndpoint = z.infer<typeof PaperlessEndpoint>;
 export const PaperlessEndpoint = z.object({
-    id: z.string().uuid(),
-    name: z.string(),
-    props: z.object({
-        server_url: z.string().url(),
-        credentials: z.object({
-            username: z.string(),
-            password: z.string()
-        })
-    })
-})
+	id: z.string().uuid(),
+	name: z.string(),
+	props: z.object({
+		server_url: z.string().url(),
+		credentials: z.object({
+			username: z.string(),
+			password: z.string(),
+		}),
+	}),
+});
 
-
-export type Account = z.infer<typeof Account>
+export type Account = z.infer<typeof Account>;
 export const Account = z.object({
-    id: z.string().uuid(),
-    name: z.string(),
-    props: z.object({
-        paperless_endpoint_id: z.string().uuid(),
-        drive_account_id: z.string().uuid(),
-        drive_src_folder_id: z.string(),
-        drive_dst_folder_id: z.string(),
-    })
-})
+	id: z.string().uuid(),
+	name: z.string(),
+	props: z.object({
+		paperless_endpoint_id: z.string().uuid(),
+		drive_account_id: z.string().uuid(),
+		drive_src_folder_id: z.string(),
+		drive_dst_folder_id: z.string(),
+	}),
+});
 
-
-export type Config = z.infer<typeof Config>
+export type Config = z.infer<typeof Config>;
 export const Config = z.object({
-    server: Server,
-    drive_accounts: z.array(DriveAccount),
-    paperless_endpoints: z.array(PaperlessEndpoint),
-    accounts: z.array(Account)
-})
+	server: Server,
+	drive_accounts: z.array(DriveAccount),
+	paperless_endpoints: z.array(PaperlessEndpoint),
+	accounts: z.array(Account),
+});

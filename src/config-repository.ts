@@ -1,42 +1,33 @@
-import fs from 'node:fs/promises'
-
+import fs from "node:fs/promises";
+import type { Logger } from "@logtape/logtape";
 import * as yml from "yaml";
-import { getLogger, Logger } from '@logtape/logtape'
-
-import { Config } from './types'
-import { ConfigRepository } from './repositories'
-
-
+import type { ConfigRepository } from "./repositories";
+import { Config } from "./types";
 
 export class ConfigFileRepository implements ConfigRepository {
+	constructor(
+		private readonly logger: Logger,
+		private readonly path: string,
+	) {}
 
-    constructor (
-        private readonly logger: Logger,
-        private readonly path: string
-    ) {}
+	public async read() {
+		this.logger.debug(`Reading config from ${this.path}`);
 
-    public async read () {
+		const raw = await fs.readFile(this.path, "utf-8");
+		const data = yml.parse(raw);
+		const res = await Config.safeParseAsync(data);
 
-        this.logger.debug(`Reading config from ${this.path}`)
+		if (!res.success) {
+			throw new Error(`Failed to parse config: ${res.error.message}`);
+		}
 
-        const raw = await fs.readFile(this.path, 'utf-8')
-        const data = yml.parse(raw)
-        const res = await Config.safeParseAsync(data)
+		return res.data;
+	}
 
-        if (!res.success) {
-            throw new Error(`Failed to parse config: ${res.error.message}`)
-        }
+	public async write(config: Config) {
+		this.logger.debug(`Writing config to ${this.path}`);
 
-        return res.data
-        
-    }
-
-
-    public async write (config: Config) {
-
-        this.logger.debug(`Writing config to ${this.path}`)
-
-        const raw = yml.stringify(config)
-        await fs.writeFile(this.path, raw)
-    }
+		const raw = yml.stringify(config);
+		await fs.writeFile(this.path, raw);
+	}
 }

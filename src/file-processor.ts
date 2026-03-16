@@ -1,186 +1,180 @@
-import axios from "axios"
-import FormData from "form-data"
-import { Logger } from "@logtape/logtape"
-import { drive_v3 } from "googleapis"
+import type { Logger } from "@logtape/logtape";
+import axios from "axios";
+import FormData from "form-data";
+import type { drive_v3 } from "googleapis";
 
-import { FileStore } from "./file-store"
-import { Account, Config } from "./types"
-import { getDriveClient, listChangesRecursive, listFilesRecursive } from "./lib"
-
-
-
+import type { FileStore } from "./file-store";
+import {
+	listChangesRecursive,
+	listFilesRecursive,
+} from "./lib";
+import type { Account, Config } from "./types";
 
 export interface DriveFile {
-    id: string;
-    name: string;
-    mimeType: string;
-    parents?: string[];
-    labels?: { [key: string]: string }
+	id: string;
+	name: string;
+	mimeType: string;
+	parents?: string[];
+	labels?: { [key: string]: string };
 }
-
 
 export type CollectChangesJobPayload = {
-    accountId: string;
-}
+	accountId: string;
+};
 
-export type CollectChangesJobResult = DriveFile[]
-
+export type CollectChangesJobResult = DriveFile[];
 
 export type ProcessChangesJobPayload = {
-    accountId: string;
-    file: DriveFile
-}
+	accountId: string;
+	file: DriveFile;
+};
 
-export type ProcessChangesJobResult = void
-
-
+export type ProcessChangesJobResult = undefined;
 
 export class FileProcessor {
+	constructor(
+		private readonly logger: Logger,
+		private readonly config: Config,
+		private readonly fileStore: FileStore,
+		private readonly account: Account,
+		private readonly driveClient: drive_v3.Drive,
+	) {}
 
-    constructor (
-        private readonly logger: Logger,
-        private readonly config: Config,
-        private readonly fileStore: FileStore,
-        private readonly account: Account,
-        private readonly driveClient: drive_v3.Drive
-    ) {}
+	public async getUnprocessedFiles(mode: "all" | "changes") {
+		this.logger.info(`Getting unprocessed files...`);
 
+		const mapper = (files: drive_v3.Schema$File[]) => {
+			return files.map<DriveFile>((file) => {
+				if (!file.id) {
+					throw new Error(`File ${file.name} has no id`);
+				}
 
+				if (!file.name) {
+					throw new Error(`File ${file.name} has no name`);
+				}
 
-    public async getUnprocessedFiles(mode: "all" | "changes") {
-        
-        this.logger.info(`Getting unprocessed files...`)
+				if (!file.mimeType) {
+					throw new Error(`File ${file.name} has no mime type`);
+				}
 
-        const mapper = (files: drive_v3.Schema$File[]) => {
-            return files.map<DriveFile>(file => {
+				return {
+					id: file.id,
+					name: file.name,
+					mimeType: file.mimeType,
+				};
+			});
+		};
 
-                if (!file.id) {
-                    throw new Error(`File ${file.name} has no id`)
-                }
-    
-                if (!file.name) {
-                    throw new Error(`File ${file.name} has no name`)
-                }
-    
-                if (!file.mimeType) {
-                    throw new Error(`File ${file.name} has no mime type`)
-                }
-    
-                return {
-                    id: file.id,
-                    name: file.name,
-                    mimeType: file.mimeType
-                } 
-    
-            })
-        }
+		const all = await listFilesRecursive(this.account, this.driveClient);
 
-        const all = await listFilesRecursive(this.account, this.driveClient);
-        
-        switch (mode) {
-            case "all": {
-                return mapper(all)
-            }
+		switch (mode) {
+			case "all": {
+				return mapper(all);
+			}
 
-            case "changes": {
-                const changes = await listChangesRecursive(this.config, this.account, this.driveClient)
-                const added = all.filter(file => changes.find(change => change.fileId === file.id))
-                return mapper(added)
-            }
+			case "changes": {
+				const changes = await listChangesRecursive(
+					this.config,
+					this.account,
+					this.driveClient,
+				);
+				const added = all.filter((file) =>
+					changes.find((change) => change.fileId === file.id),
+				);
+				return mapper(added);
+			}
+		}
+	}
 
-        }
-    }
+	public async processFile(file: DriveFile) {
+		this.logger.info(`Processing file ${file.name}...`, { file });
 
+		await this.downloadFileFromDrive(file).catch((err) => {
+			this.logger.error(`Failed to download file ${file.name} from GDrive`, {
+				err,
+			});
+			throw err;
+		});
 
-    public async processFile(file: DriveFile) {
+		await this.uploadFileToPaperless(file).catch((err) => {
+			this.logger.error(`Failed to upload file ${file.name} to Paperless`, {
+				err,
+			});
+			throw err;
+		});
 
-        this.logger.info(`Processing file ${file.name}...`, { file })
-        
-        await this.downloadFileFromDrive(file).catch(err => {
-            this.logger.error(`Failed to download file ${file.name} from GDrive`, { err })
-            throw err
-        })
+		await this.moveFile(file).catch((err) => {
+			this.logger.error(`Failed to move file ${file.name}`, { err });
+			throw err;
+		});
+	}
 
-        await this.uploadFileToPaperless(file).catch(err => {
-            this.logger.error(`Failed to upload file ${file.name} to Paperless`, { err })
-            throw err
-        })
-        
-        await this.moveFile(file).catch(err => {
-            this.logger.error(`Failed to move file ${file.name}`, { err })
-            throw err
-        })
+	private async downloadFileFromDrive(file: DriveFile) {
+		this.logger.info(`Downloading file ${file.name} from GDrive ...`, { file });
 
-    }
+		const res = await this.driveClient.files.get(
+			{
+				fileId: file.id,
+				alt: "media",
+			},
+			{ responseType: "stream" },
+		);
 
+		await this.fileStore.upload(this.getFileStoreName(file), res.data);
+	}
 
+	private async uploadFileToPaperless(file: DriveFile) {
+		this.logger.info(`Uploading file ${file.name} to Paperless ...`, { file });
 
-    private async downloadFileFromDrive(file: DriveFile) {
-        
-        this.logger.info(`Downloading file ${file.name} from GDrive ...`, { file })
+		const endpoint = this.config.paperless_endpoints.find(
+			(endpoint) => endpoint.id === this.account.props.paperless_endpoint_id,
+		);
 
-        const res = await this.driveClient.files.get({
-            fileId: file.id,
-            alt: 'media'
-        }, { responseType: 'stream' });
+		if (!endpoint) {
+			throw new Error(
+				`Failed to find paperless endpoint for ${this.account.name}`,
+			);
+		}
 
-        await this.fileStore.upload(this.getFileStoreName(file), res.data)
+		const form = new FormData();
+		const url = `${endpoint.props.server_url}/api/documents/post_document/`;
+		const username = endpoint.props.credentials.username;
+		const password = endpoint.props.credentials.password;
+		const authHeaderValue = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
 
-    }
+		const buffer = await this.fileStore.download(this.getFileStoreName(file), {
+			deleteAfterWrite: true,
+		});
+		form.append("document", buffer, {
+			filename: file.name,
+			contentType: file.mimeType,
+		});
 
+		const res = await axios.request({
+			method: "post",
+			url,
+			data: form,
+			headers: {
+				Authorization: authHeaderValue,
+			},
+		});
 
-    private async uploadFileToPaperless(file: DriveFile) {
+		if (res.status !== 200) {
+			throw new Error(`Paperless upload failed: ${res.statusText}`);
+		}
+	}
 
-        this.logger.info(`Uploading file ${file.name} to Paperless ...`, { file })
+	private async moveFile(file: DriveFile) {
+		this.logger.info(`Moving file ${file.name}...`, { file });
 
-        const endpoint = this.config.paperless_endpoints.find(endpoint => endpoint.id === this.account.props.paperless_endpoint_id)
+		await this.driveClient.files.update({
+			fileId: file.id,
+			addParents: this.account.props.drive_dst_folder_id,
+			removeParents: this.account.props.drive_src_folder_id,
+		});
+	}
 
-        if (!endpoint) {
-            throw new Error(`Failed to find paperless endpoint for ${this.account.name}`)
-        }
-
-        const form = new FormData();
-        const url = endpoint.props.server_url + "/api/documents/post_document/"
-        const username = endpoint.props.credentials.username
-        const password = endpoint.props.credentials.password
-        const authHeaderValue = `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`
-
-        const buffer = await this.fileStore.download(this.getFileStoreName(file), { deleteAfterWrite: true })
-        form.append("document", buffer, { filename: file.name, contentType: file.mimeType });
-        
-
-        const res = await axios.request({
-            method: 'post',
-            url,
-            data: form,
-            headers: {
-                Authorization: authHeaderValue
-            }
-        })
-
-        if (res.status !== 200) {
-            throw new Error(`Paperless upload failed: ${res.statusText}`);
-        }
-
-    }
-
-
-    private async moveFile(file: DriveFile) {
-
-        this.logger.info(`Moving file ${file.name}...`, { file })
-
-        await this.driveClient.files.update({
-            fileId: file.id,
-            addParents: this.account.props.drive_dst_folder_id,
-            removeParents: this.account.props.drive_src_folder_id
-        })
-
-    }
-
-
-    private getFileStoreName(file: DriveFile) {
-        return `${this.account.id}_${file.id}`
-    }
-
-
+	private getFileStoreName(file: DriveFile) {
+		return `${this.account.id}_${file.id}`;
+	}
 }

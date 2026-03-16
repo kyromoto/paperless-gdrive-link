@@ -1,48 +1,49 @@
 {
-  "name": "paperless-gdrive-link",
-  "version": "1.5.0",
-  "description": "Use Google Drive as watchfolder for paperless-ngx",
-  "license": "MIT",
-  "keywords": [
-    "paperless-ngx",
-    "gdrive"
-  ],
-  "author": {
-    "name": "kyromoto",
-    "email": "info@kyromoto.de"
-  },
-  "scripts": {
-    "build": "rm -rf ./build && tsc",
-    "dev": "tsx watch --env-file=.env src/main.ts"
-  },
-  "devDependencies": {
-    "@semantic-release/changelog": "6.0",
-    "@semantic-release/git": "10.0",
-    "@semantic-release/github": "11.0",
-    "@types/express": "5.0",
-    "@types/node": "24.5",
-    "semantic-release": "24.2",
-    "tsx": "4.20",
-    "typescript": "5.8"
-  },
-  "dependencies": {
-    "@logtape/logtape": "1.1",
-    "@logtape/redaction": "1.1",
-    "axios": "1.13",
-    "bullmq": "5.59",
-    "catch-exit": "2.0",
-    "dotenv": "17.0",
-    "express": "5.1",
-    "form-data": "4.0",
-    "google-auth-library": "10.1",
-    "googleapis": "150.0",
-    "helmet": "8.1",
-    "ioredis": "5.8",
-    "neverthrow": "8.2",
-    "yaml": "2.8",
-    "zod": "3.25"
-  },
-  "engines": {
-    "node": ">=22"
-  }
+	"name": "paperless-gdrive-link",
+	"version": "1.5.0",
+	"description": "Use Google Drive as watchfolder for paperless-ngx",
+	"license": "MIT",
+	"keywords": [
+		"paperless-ngx",
+		"gdrive"
+	],
+	"author": {
+		"name": "kyromoto",
+		"email": "info@kyromoto.de"
+	},
+	"scripts": {
+		"build": "rm -rf ./build && tsc",
+		"dev": "tsx watch --env-file=.env src/main.ts"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.7",
+		"@semantic-release/changelog": "6.0",
+		"@semantic-release/git": "10.0",
+		"@semantic-release/github": "11.0",
+		"@types/express": "5.0",
+		"@types/node": "24.5",
+		"semantic-release": "24.2",
+		"tsx": "4.20",
+		"typescript": "5.8"
+	},
+	"dependencies": {
+		"@logtape/logtape": "1.1",
+		"@logtape/redaction": "1.1",
+		"axios": "1.13",
+		"bullmq": "5.59",
+		"catch-exit": "2.0",
+		"dotenv": "17.0",
+		"express": "5.1",
+		"form-data": "4.0",
+		"google-auth-library": "10.1",
+		"googleapis": "150.0",
+		"helmet": "8.1",
+		"ioredis": "5.8",
+		"neverthrow": "8.2",
+		"yaml": "2.8",
+		"zod": "3.25"
+	},
+	"engines": {
+		"node": ">=22"
+	}
 }

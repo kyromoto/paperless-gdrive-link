@@ -1,7 +1,5 @@
-import { Config } from "./types";
-
-
+import type { Config } from "./types";
 
 export interface ConfigRepository {
-    read: () => Promise<Config>
+	read: () => Promise<Config>;
 }

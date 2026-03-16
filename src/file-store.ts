@@ -1,65 +1,58 @@
-
-import fs from "node:fs" 
-import fsPromises from "node:fs/promises"
-import path from "node:path"
-import { Readable } from "node:stream"
-import { pipeline } from "node:stream/promises"
-
+import fs from "node:fs";
+import fsPromises from "node:fs/promises";
+import path from "node:path";
+import type { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
 export class FileStore {
+	private _initialized = false;
 
-    private _initialized = false
+	constructor(private readonly path: string) {}
 
-    constructor(private readonly path: string) {}
+	public async init() {
+		await this.createPathIfNotExists();
+		this._initialized = true;
+	}
 
+	public async upload(id: string, content: Readable) {
+		this.checkInitialized();
+		const filename = this.getFilename(id);
+		const writer = fs.createWriteStream(filename);
+		await pipeline(content, writer);
+	}
 
-    public async init() {
-        await this.createPathIfNotExists()
-        this._initialized = true
-    }
+	public async download(id: string, opts?: { deleteAfterWrite?: boolean }) {
+		this.checkInitialized();
+		const filename = this.getFilename(id);
+		const reader = fs.createReadStream(filename);
 
+		const buffer = await new Promise<Buffer>((resolve, reject) => {
+			const chunks: Buffer[] = [];
+			reader.on("data", (chunk) => chunks.push(chunk as Buffer));
+			reader.on("end", () => resolve(Buffer.concat(chunks)));
+			reader.on("error", (err: Error) => reject(err));
+		});
 
-    public async upload(id: string, content: Readable) {
-        this.checkInitialized()
-        const filename = this.getFilename(id)
-        const writer = fs.createWriteStream(filename)
-        await pipeline(content, writer)
-    }
+		if (opts?.deleteAfterWrite) {
+			await fsPromises.unlink(filename);
+		}
 
-    public async download(id: string, opts?: { deleteAfterWrite?: boolean }) {
-        this.checkInitialized()
-        const filename = this.getFilename(id)
-        const reader = fs.createReadStream(filename)
-        
-        const buffer = await new Promise<Buffer>((resolve, reject) => {
-            const chunks: Buffer[] = [];
-            reader.on('data', chunk => chunks.push(chunk as Buffer));
-            reader.on('end', () => resolve(Buffer.concat(chunks)));
-            reader.on('error', (err: Error) => reject(err));
-        })
+		return buffer;
+	}
 
-        if (opts?.deleteAfterWrite) {
-            await fsPromises.unlink(filename)
-        }
+	private getFilename(id: string) {
+		return path.join(this.path, id);
+	}
 
-        return buffer
-    }
+	private async createPathIfNotExists() {
+		await fsPromises.access(this.path, fs.constants.W_OK).catch(async () => {
+			await fsPromises.mkdir(this.path, { recursive: true });
+		});
+	}
 
-
-    private getFilename(id: string) {
-        return path.join(this.path, id)
-    }
-
-    private async createPathIfNotExists() {
-        await fsPromises.access(this.path, fs.constants.W_OK).catch(async err => {
-            await fsPromises.mkdir(this.path, { recursive: true })
-        })
-    }
-
-    private checkInitialized() {
-        if (!this._initialized) {
-            throw new Error("FileStore is not initialized")
-        }
-    }
-
+	private checkInitialized() {
+		if (!this._initialized) {
+			throw new Error("FileStore is not initialized");
+		}
+	}
 }
