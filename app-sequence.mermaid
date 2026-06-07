@@ -1,0 +1,58 @@
+flowchart TD
+    subgraph INIT["🚀 Startup"]
+        A([Start]) --> B[Config laden]
+        B --> C[FileStore init]
+        C --> D[Redis / BullMQ verbinden]
+        D --> E[FileProcessors pro Account erstellen]
+        E --> F[DriveMonitors pro Account erstellen]
+        F --> G[Ausstehende Dateien aus Watchfoldern holen]
+        G -->|alle gefundenen Dateien| H[process-changes Queue füllen]
+        H --> I[HTTP Server starten]
+        I --> J[DriveMonitors starten → Webhook bei Google Drive registrieren]
+    end
+
+    subgraph MONITOR["🔔 DriveMonitor – Webhook-Kanal"]
+        J --> K[Google Drive Webhook-Kanal öffnen\nmit Ablaufzeit]
+        K --> L[Renewal-Task im TaskScheduler registrieren\n30s vor Ablauf]
+        L --> M{Kanal läuft ab?}
+        M -->|Ja – TaskScheduler feuert| K
+    end
+
+    subgraph WEBHOOK["📬 Webhook-Empfang POST /webhook"]
+        N[Google Drive sendet Change-Notification] --> O{Channel-ID bekannt?}
+        O -->|Nein| P[Ignorieren → 200 OK]
+        O -->|Ja – sync event| Q[Ignorieren → 200 OK]
+        O -->|Ja – change event| R[collect-changes Job in Queue stellen]
+    end
+
+    subgraph COLLECT["⚙️ collect-changes Worker"]
+        R --> S[getUnprocessedFiles 'changes']
+        S --> T[Drive Changes API aufrufen\nneue Dateien in Src-Folder ermitteln]
+        T --> U[pro Datei: process-changes Job in Queue stellen]
+    end
+
+    subgraph PROCESS["📄 process-changes Worker"]
+        U --> V[processFile]
+        V --> W[Datei von Google Drive herunterladen\n→ FileStore lokal]
+        W --> X[Datei zu Paperless-ngx hochladen\nPOST /api/documents/post_document/]
+        X --> Y[Datei in Drive verschieben\nSrc-Folder → Dst-Folder]
+        Y --> Z([Fertig])
+    end
+
+    subgraph EXTERNAL["Externe Systeme"]
+        GD[(Google Drive\nSrc-Folder)]
+        GD2[(Google Drive\nDst-Folder)]
+        PL[(Paperless-ngx)]
+        RD[(Redis)]
+    end
+
+    K <-->|files.watch API| GD
+    N -->|HTTP POST| WEBHOOK
+    S <-->|changes.list API| GD
+    W <-->|files.get stream| GD
+    X -->|HTTP POST Basic Auth| PL
+    Y -->|files.update parents| GD
+    Y -->|verschoben| GD2
+    R -->|BullMQ| RD
+    U -->|BullMQ| RD
+    H -->|BullMQ| RD

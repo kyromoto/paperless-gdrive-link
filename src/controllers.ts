@@ -61,7 +61,7 @@ export const handleWebhook = (
 				queue.name,
 				{ accountId: account.id },
 				{
-					jobId: crypto.randomUUID(),
+					jobId: `collect-changes-${account.id}`,
 				},
 			);
 
