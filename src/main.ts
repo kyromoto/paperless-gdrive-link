@@ -205,7 +205,7 @@ const ROOT_LOGGER_KEY = "app";
 			files.map((file) => ({
 				name: "process-changes",
 				data: { accountId: job.data.accountId, file },
-				opts: { jobId: crypto.randomUUID() },
+				opts: { jobId: `process-changes-${job.data.accountId}-${file.id}` },
 			})),
 		);
 	});
@@ -311,7 +311,7 @@ const ROOT_LOGGER_KEY = "app";
 					return files.map<ProcessFileBulkJob>((file) => ({
 						name: collectChangesQueue.name,
 						data: { accountId, file },
-						opts: { jobId: crypto.randomUUID() },
+						opts: { jobId: `process-changes-${accountId}-${file.id}` },
 					}));
 				},
 			),
