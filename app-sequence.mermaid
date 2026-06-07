@@ -22,13 +22,13 @@ flowchart TD
         N[Google Drive sendet Change-Notification] --> O{Channel-ID bekannt?}
         O -->|Nein| P[Ignorieren → 200 OK]
         O -->|Ja – sync event| Q[Ignorieren → 200 OK]
-        O -->|Ja – change event| R[collect-changes Job in Queue stellen]
+        O -->|Ja – change event| R["collect-changes Job in Queue stellen\njobId: collect-changes-{accountId}\n→ BullMQ dedupliziert bei gleichzeitigen Webhooks"]
     end
 
     subgraph COLLECT["⚙️ collect-changes Worker"]
         R --> S[getUnprocessedFiles 'changes']
         S --> T[Drive Changes API aufrufen\nneue Dateien in Src-Folder ermitteln]
-        T --> U[pro Datei: process-changes Job in Queue stellen]
+        T --> U["pro Datei: process-changes Job in Queue stellen\njobId: process-changes-{accountId}-{fileId}\n→ BullMQ dedupliziert Duplikate aus Startup-Scan + Webhook"]
     end
 
     subgraph PROCESS["📄 process-changes Worker"]

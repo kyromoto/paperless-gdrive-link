@@ -82,6 +82,15 @@ On startup, all files currently in the src folder are scanned and queued directl
 ### Important invariants
 
 - The `collect-changes` jobId is `collect-changes-${accountId}` (deterministic). This prevents concurrent collect jobs for the same account from racing on the Drive change token. Do not change it to a random ID.
+- The `process-changes` jobId is `process-changes-${accountId}-${fileId}` (deterministic). This prevents the same file from being downloaded/uploaded to Paperless twice concurrently (FileStore collision). Do not change it to a random ID.
 - The Drive change token is persisted to disk at `{data_path}/tokens/{accountId}.{folderId}.change-token.txt`. If the token file is missing, the app bootstraps a fresh one from `changes.getStartPageToken`.
 - `process-changes` worker runs with concurrency 1 by default. Increasing it risks concurrent FileStore access for the same file (same `{accountId}_{fileId}` path).
 - `@logtape/redaction` automatically strips JWTs and private keys from logs. Do not bypass the logger for sensitive config fields.
+
+## Diagrams
+
+[`app-sequence.mermaid`](app-sequence.mermaid) is the authoritative flow diagram. **Update it whenever the processing pipeline changes** (queue names, jobId scheme, step order, new/removed actors). It reflects the current state including RC fixes.
+
+## Backlog
+
+Open work items are tracked in [`BACKLOG.md`](BACKLOG.md). Read it before working on race conditions or the DriveMonitor.
