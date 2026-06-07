@@ -1,3 +1,10 @@
+## [1.5.2](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.5.1...v1.5.2) (2026-06-07)
+
+
+### Bug Fixes
+
+* Race Condition 1 — Change Token (kritisch) - by Claude ([28e95a4](https://github.com/kyromoto/paperless-gdrive-link/commit/28e95a45266510a48b17f51dd48bfb855a7b1f04))
+
 ## [1.5.1](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.5.0...v1.5.1) (2026-03-16)
 
 
