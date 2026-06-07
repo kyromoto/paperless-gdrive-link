@@ -1,3 +1,10 @@
+## [1.5.4](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.5.3...v1.5.4) (2026-06-07)
+
+
+### Bug Fixes
+
+* claude pflegen ([278a8b9](https://github.com/kyromoto/paperless-gdrive-link/commit/278a8b9bdd9342a859006e1df5121f243cc111d1))
+
 ## [1.5.3](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.5.2...v1.5.3) (2026-06-07)
 
 
