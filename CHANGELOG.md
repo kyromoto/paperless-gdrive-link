@@ -1,3 +1,10 @@
+## [1.5.8](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.5.7...v1.5.8) (2026-06-08)
+
+
+### Bug Fixes
+
+* unused function ([541b3cc](https://github.com/kyromoto/paperless-gdrive-link/commit/541b3cc2228aa50a45f0ae84006c35fbf68fbcb2))
+
 ## [1.5.7](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.5.6...v1.5.7) (2026-06-08)
 
 
