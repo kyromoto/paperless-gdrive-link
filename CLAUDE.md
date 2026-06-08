@@ -39,8 +39,8 @@ Multiple accounts can be configured; each gets its own `DriveMonitor` and `FileP
 Google Drive (src folder)
     │
     ▼ [files.watch webhook channel]
-DriveMonitor  ──renewal task──▶  TaskScheduler (in-process, interval-based)
-    │
+DriveMonitor  ──delayed job──▶  renew-channel Queue  (BullMQ/Redis)
+    │                               jobId = "renew-channel-{accountId}" ← fires 30s before expiry
     │ Google Drive sends HTTP POST
     ▼
 POST /webhook  (controllers.ts)
@@ -63,15 +63,14 @@ process-changes Worker
 Done
 ```
 
-On startup, all files currently in the src folder are scanned and queued directly into `process-changes` (bypassing collect), so nothing is missed while the app was offline.
+On startup, all files currently in the src folder are scanned and queued directly into `process-changes` (bypassing collect), so nothing is missed while the app was offline. Stale `renew-channel` delayed jobs from the previous run are drained before `monitor.start()` is called, to avoid spurious double-starts after a restart.
 
 ### Key components
 
 | File | Role |
 |---|---|
 | `src/main.ts` | Wires everything together; owns queue/worker setup and startup scan |
-| `src/drive-monitor.ts` | Manages one Google Drive webhook channel per account; schedules renewal 30s before expiry |
-| `src/task-scheduler.ts` | In-process scheduler using `setInterval`; used only for channel renewal |
+| `src/drive-monitor.ts` | Manages one Google Drive webhook channel per account; schedules renewal via BullMQ delayed job 30s before expiry |
 | `src/file-processor.ts` | `getUnprocessedFiles()` + `processFile()` — the core business logic |
 | `src/file-store.ts` | Thin wrapper around local filesystem for buffering files between download and upload |
 | `src/lib.ts` | `listFilesRecursive`, `listChangesRecursive` (manages change token), `getDriveClient` |
@@ -83,6 +82,7 @@ On startup, all files currently in the src folder are scanned and queued directl
 
 - The `collect-changes` jobId is `collect-changes-${accountId}` (deterministic). This prevents concurrent collect jobs for the same account from racing on the Drive change token. Do not change it to a random ID.
 - The `process-changes` jobId is `process-changes-${accountId}-${fileId}` (deterministic). This prevents the same file from being downloaded/uploaded to Paperless twice concurrently (FileStore collision). Do not change it to a random ID.
+- The `renew-channel` jobId is `renew-channel-${accountId}` (deterministic). `monitor.start()` removes any existing job with this ID before adding a new one, so each account always has at most one pending renewal. The queue is drained on startup to clear stale jobs from the previous process.
 - The Drive change token is persisted to disk at `{data_path}/tokens/{accountId}.{folderId}.change-token.txt`. If the token file is missing, the app bootstraps a fresh one from `changes.getStartPageToken`.
 - `process-changes` worker runs with concurrency 1 by default. Increasing it risks concurrent FileStore access for the same file (same `{accountId}_{fileId}` path).
 - `@logtape/redaction` automatically strips JWTs and private keys from logs. Do not bypass the logger for sensitive config fields.

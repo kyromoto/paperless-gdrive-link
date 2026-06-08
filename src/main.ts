@@ -4,12 +4,7 @@ import fs from "node:fs/promises";
 import type http from "node:http";
 import path from "node:path";
 import logtape from "@logtape/logtape";
-import {
-	DEFAULT_REDACT_FIELDS,
-	JWT_PATTERN,
-	redactByField,
-	redactByPattern,
-} from "@logtape/redaction";
+import { DEFAULT_REDACT_FIELDS, JWT_PATTERN, redactByField, redactByPattern } from "@logtape/redaction";
 import * as bullmq from "bullmq";
 import { addExitCallback } from "catch-exit";
 import express from "express";
@@ -18,22 +13,19 @@ import IORedis, { type RedisOptions } from "ioredis";
 import { err, ok, Result } from "neverthrow";
 import { ConfigFileRepository } from "./config-repository";
 import { handleHealthCheck, handleWebhook } from "./controllers";
+import type { RenewChannelJobPayload } from "./drive-monitor";
 import { DriveMonitor } from "./drive-monitor";
 import * as env from "./env";
 import {
-	FileProcessor,
 	type CollectChangesJobPayload,
 	type CollectChangesJobResult,
+	FileProcessor,
 	type ProcessChangesJobPayload,
 	type ProcessChangesJobResult,
 } from "./file-processor";
 import { FileStore } from "./file-store";
 import { getDriveClient } from "./lib";
-import {
-	makeCollectChangesQueueProcessor,
-	makeProcessChangesQueueProcessor,
-} from "./queue-processor";
-import { makeTaskScheduler } from "./task-scheduler";
+import { makeCollectChangesQueueProcessor, makeProcessChangesQueueProcessor } from "./queue-processor";
 
 type ProcessFileBulkJob = {
 	name: string;
@@ -83,9 +75,7 @@ const ROOT_LOGGER_KEY = "app";
 		sinks: {
 			console: redactByField(
 				logtape.getConsoleSink({
-					formatter: redactByPattern(logtape.defaultConsoleFormatter, [
-						JWT_PATTERN,
-					]),
+					formatter: redactByPattern(logtape.defaultConsoleFormatter, [JWT_PATTERN]),
 				}),
 				[...DEFAULT_REDACT_FIELDS, "private_key"],
 			),
@@ -107,25 +97,15 @@ const ROOT_LOGGER_KEY = "app";
 	const logger = logtape.getLogger(ROOT_LOGGER_KEY);
 
 	logger.info("Loading env ...");
-	logger.info(
-		Object.entries(env).reduce(
-			(obj, [key, value]) => Object.assign(obj, { [key]: value }),
-			{},
-		),
-	);
+	logger.info(Object.entries(env).reduce((obj, [key, value]) => Object.assign(obj, { [key]: value }), {}));
 
 	logger.info("Loading config ...");
-	const config = await new ConfigFileRepository(
-		logger.getChild("config-repository"),
-		env.CONFIG_PATH,
-	).read();
+	const config = await new ConfigFileRepository(logger.getChild("config-repository"), env.CONFIG_PATH).read();
 	logger.debug(config);
 
 	logger.info("Check data path exists ...");
 	await fs.access(config.server.data_path).catch(async () => {
-		logger.warn(
-			`Data path ${config.server.data_path} does not exist, creating...`,
-		);
+		logger.warn(`Data path ${config.server.data_path} does not exist, creating...`);
 		await fs.mkdir(config.server.data_path, { recursive: true });
 	});
 
@@ -133,22 +113,13 @@ const ROOT_LOGGER_KEY = "app";
 	const fileStore = new FileStore(path.join(config.server.data_path, "files"));
 	await fileStore.init();
 
-	logger.info("Initializing task scheduler ...");
-	const taskScheduler = makeTaskScheduler(logger.getChild("task-scheduler"), {
-		intervalMs: config.server.task_schedular.interval_ms,
-		maxConcurrentTasks: config.server.task_schedular.concurrency,
-	});
-
 	const monitors = new Map<string, DriveMonitor>();
 	const processors = new Map<string, FileProcessor>();
 
 	logger.info(`Connecting to redis at ${config.server.queue.redis.url} ...`);
 
 	const redisOptions: RedisOptions = { maxRetriesPerRequest: null };
-	const redisConnection = new IORedis(
-		config.server.queue.redis.url,
-		redisOptions,
-	);
+	const redisConnection = new IORedis(config.server.queue.redis.url, redisOptions);
 
 	await new Promise<void>((resolve, reject) => {
 		redisConnection.once("ready", resolve);
@@ -168,27 +139,44 @@ const ROOT_LOGGER_KEY = "app";
 		removeOnFail: { count: 10 },
 	};
 
-	const collectChangesQueue = new bullmq.Queue<
-		CollectChangesJobPayload,
-		CollectChangesJobResult
-	>("collect-changes", queueOptions);
-	const processChangesQueue = new bullmq.Queue<
-		ProcessChangesJobPayload,
-		ProcessChangesJobResult
-	>("process-changes", queueOptions);
+	const collectChangesQueue = new bullmq.Queue<CollectChangesJobPayload, CollectChangesJobResult>(
+		"collect-changes",
+		queueOptions,
+	);
+	
+	const processChangesQueue = new bullmq.Queue<ProcessChangesJobPayload, ProcessChangesJobResult>(
+		"process-changes",
+		queueOptions,
+	);
+	
+	const renewChannelQueue = new bullmq.Queue<RenewChannelJobPayload>(
+		"renew-channel",
+		queueOptions,
+	);
+	
 	const collectChangesWorker = new bullmq.Worker(
 		collectChangesQueue.name,
-		makeCollectChangesQueueProcessor(
-			logger.getChild(collectChangesQueue.name),
-			config,
-			processors,
-		),
+		makeCollectChangesQueueProcessor(logger.getChild(collectChangesQueue.name), config, processors),
 		{ ...workerOptions, concurrency: config.server.queue.concurrency.collect },
 	);
+	
 	const processChangesWorker = new bullmq.Worker(
 		processChangesQueue.name,
 		makeProcessChangesQueueProcessor(processors),
 		{ ...workerOptions, concurrency: config.server.queue.concurrency.process },
+	);
+	
+	const renewChannelWorker = new bullmq.Worker<RenewChannelJobPayload>(
+		renewChannelQueue.name,
+		async (job) => {
+			const monitor = monitors.get(job.data.accountId);
+			if (!monitor) {
+				logger.error(`No monitor found for accountId ${job.data.accountId}`);
+				return;
+			}
+			await monitor.start();
+		},
+		workerOptions,
 	);
 
 	collectChangesWorker.on("active", (job) => {
@@ -213,16 +201,11 @@ const ROOT_LOGGER_KEY = "app";
 	collectChangesWorker.on("failed", (job, error) => {
 		logger
 			.getChild([collectChangesQueue.name, job?.id?.toString() || "unkown-id"])
-			.error(
-				`${job?.data.accountId || "unkown-account"} collecting changes failed: ${error.message}`,
-				{ job, error },
-			);
+			.error(`${job?.data.accountId || "unkown-account"} collecting changes failed: ${error.message}`, { job, error });
 	});
 
 	collectChangesQueue.on("error", (error) => {
-		logger
-			.getChild(collectChangesQueue.name)
-			.error(`queue error: ${error.message}`, { error });
+		logger.getChild(collectChangesQueue.name).error(`queue error: ${error.message}`, { error });
 	});
 
 	processChangesWorker.on("active", (job) => {
@@ -240,25 +223,40 @@ const ROOT_LOGGER_KEY = "app";
 	processChangesWorker.on("failed", (job, error) => {
 		logger
 			.getChild([processChangesQueue.name, job?.id?.toString() || "unkown-id"])
-			.error(
-				`${job?.data.file.name || "unkown-file"} processing failed: ${error.message}`,
-				{ error },
-			);
+			.error(`${job?.data.file.name || "unkown-file"} processing failed: ${error.message}`, { error });
 	});
 
 	processChangesQueue.on("error", (error) => {
+		logger.getChild(processChangesQueue.name).error(`queue error: ${error.message}`, { error });
+	});
+
+	renewChannelWorker.on("active", (job) => {
 		logger
-			.getChild(processChangesQueue.name)
-			.error(`queue error: ${error.message}`, { error });
+			.getChild([renewChannelQueue.name, job.id?.toString() || "unkown-id"])
+			.info(`${job.data.accountId} channel renewal started`, { job });
+	});
+
+	renewChannelWorker.on("completed", (job) => {
+		logger
+			.getChild([renewChannelQueue.name, job.id?.toString() || "unkown-id"])
+			.info(`${job.data.accountId} channel renewal completed`, { job });
+	});
+
+	renewChannelWorker.on("failed", (job, error) => {
+		logger
+			.getChild([renewChannelQueue.name, job?.id?.toString() || "unknown-id"])
+			.error(`${job?.data.accountId || "unknown-account"} channel renewal failed: ${error.message}`, { error });
+	});
+
+	renewChannelQueue.on("error", (error) => {
+		logger.getChild(renewChannelQueue.name).error(`queue error: ${error.message}`, { error });
 	});
 
 	logger.info("Initializing file processors ...");
 
 	const initProcessorsResult = Result.combineWithAllErrors(
 		config.accounts.map((account) => {
-			const driveAccount = config.drive_accounts.find(
-				(drive) => drive.id === account.props.drive_account_id,
-			);
+			const driveAccount = config.drive_accounts.find((drive) => drive.id === account.props.drive_account_id);
 
 			if (!driveAccount) {
 				return err({
@@ -293,35 +291,25 @@ const ROOT_LOGGER_KEY = "app";
 	for (const account of config.accounts) {
 		monitors.set(
 			account.id,
-			new DriveMonitor(
-				logger.getChild(["drive-monitor", account.name]),
-				config,
-				account,
-				taskScheduler,
-			)
+			new DriveMonitor(logger.getChild(["drive-monitor", account.name]), config, account, renewChannelQueue),
 		);
 	}
 
 	logger.info("Collect outstanding files from watchfolders ...");
 	const processingJobs = (
 		await Promise.all(
-			Array.from(processors.entries()).map<Promise<ProcessFileBulkJob[]>>(
-				async ([accountId, processor]) => {
-					const files = await processor.getUnprocessedFiles("all");
-					return files.map<ProcessFileBulkJob>((file) => ({
-						name: processChangesQueue.name,
-						data: { accountId, file },
-						opts: { jobId: `process-changes-${accountId}-${file.id}` },
-					}));
-				},
-			),
+			Array.from(processors.entries()).map<Promise<ProcessFileBulkJob[]>>(async ([accountId, processor]) => {
+				const files = await processor.getUnprocessedFiles("all");
+				return files.map<ProcessFileBulkJob>((file) => ({
+					name: processChangesQueue.name,
+					data: { accountId, file },
+					opts: { jobId: `process-changes-${accountId}-${file.id}` },
+				}));
+			}),
 		)
 	).flat();
 
-	logger.info(
-		`Queue ${processingJobs.length} outstanding files for processing ...`,
-		{ processingJobs },
-	);
+	logger.info(`Queue ${processingJobs.length} outstanding files for processing ...`, { processingJobs });
 	await processChangesQueue.addBulk(processingJobs);
 
 	logger.info(`Starting http server at port ${config.server.http.port}...`);
@@ -330,15 +318,7 @@ const ROOT_LOGGER_KEY = "app";
 	app.use(helmet());
 	app.use(express.json());
 	app.get("/health", handleHealthCheck());
-	app.post(
-		"/webhook",
-		handleWebhook(
-			logger.getChild("webhook-controller"),
-			config,
-			collectChangesQueue,
-			monitors
-		),
-	);
+	app.post("/webhook", handleWebhook(logger.getChild("webhook-controller"), config, collectChangesQueue, monitors));
 
 	const server = await new Promise<http.Server>((resolve, reject) => {
 		const server = app.listen(config.server.http.port, (err) => {
@@ -346,13 +326,12 @@ const ROOT_LOGGER_KEY = "app";
 		});
 	});
 
+	logger.info("Clearing stale renew-channel jobs ...");
+	await renewChannelQueue.drain();
+
 	logger.info("Starting drive monitors ...");
-	await Promise.all(
-		Array.from(monitors.values()).map((monitor) => monitor.start()),
-	);
+	await Promise.all(Array.from(monitors.values()).map((monitor) => monitor.start()));
 
 	const elapsedMs = (Date.now() - startTime) / 1000;
-	logger.info(
-		`Application started in ${elapsedMs} seconds`,
-	);
+	logger.info(`Application started in ${elapsedMs} seconds`);
 })();

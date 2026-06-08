@@ -5,38 +5,39 @@ flowchart TD
         C --> D[Redis / BullMQ verbinden]
         D --> E[FileProcessors pro Account erstellen]
         E --> F[DriveMonitors pro Account erstellen]
-        F --> G[Ausstehende Dateien aus Watchfoldern holen]
-        G -->|alle gefundenen Dateien| H[process-changes Queue füllen]
-        H --> I[HTTP Server starten]
-        I --> J[DriveMonitors starten → Webhook bei Google Drive registrieren]
+        F --> G[Stale renew-channel Jobs aus Queue räumen]
+        G --> H[Ausstehende Dateien aus Watchfoldern holen]
+        H -->|alle gefundenen Dateien| I[process-changes Queue füllen]
+        I --> J[HTTP Server starten]
+        J --> K[DriveMonitors starten → Webhook bei Google Drive registrieren]
     end
 
     subgraph MONITOR["🔔 DriveMonitor – Webhook-Kanal"]
-        J --> K[Google Drive Webhook-Kanal öffnen\nmit Ablaufzeit]
-        K --> L[Renewal-Task im TaskScheduler registrieren\n30s vor Ablauf]
-        L --> M{Kanal läuft ab?}
-        M -->|Ja – TaskScheduler feuert| K
+        K --> L[Google Drive Webhook-Kanal öffnen\nmit Ablaufzeit]
+        L --> M["renew-channel Delayed Job in Queue stellen\njobId: renew-channel-{accountId}\n30s vor Kanalablauf"]
+        M --> N{Kanal läuft ab?}
+        N -->|Ja – BullMQ Delayed Job feuert| L
     end
 
     subgraph WEBHOOK["📬 Webhook-Empfang POST /webhook"]
-        N[Google Drive sendet Change-Notification] --> O{Channel-ID bekannt?}
-        O -->|Nein| P[Ignorieren → 200 OK]
-        O -->|Ja – sync event| Q[Ignorieren → 200 OK]
-        O -->|Ja – change event| R["collect-changes Job in Queue stellen\njobId: collect-changes-{accountId}\n→ BullMQ dedupliziert bei gleichzeitigen Webhooks"]
+        O[Google Drive sendet Change-Notification] --> P{Channel-ID bekannt?}
+        P -->|Nein| Q[Ignorieren → 200 OK]
+        P -->|Ja – sync event| R[Ignorieren → 200 OK]
+        P -->|Ja – change event| S["collect-changes Job in Queue stellen\njobId: collect-changes-{accountId}\n→ BullMQ dedupliziert bei gleichzeitigen Webhooks"]
     end
 
     subgraph COLLECT["⚙️ collect-changes Worker"]
-        R --> S[getUnprocessedFiles 'changes']
-        S --> T[Drive Changes API aufrufen\nneue Dateien in Src-Folder ermitteln]
-        T --> U["pro Datei: process-changes Job in Queue stellen\njobId: process-changes-{accountId}-{fileId}\n→ BullMQ dedupliziert Duplikate aus Startup-Scan + Webhook"]
+        S --> T[getUnprocessedFiles 'changes']
+        T --> U[Drive Changes API aufrufen\nneue Dateien in Src-Folder ermitteln]
+        U --> V["pro Datei: process-changes Job in Queue stellen\njobId: process-changes-{accountId}-{fileId}\n→ BullMQ dedupliziert Duplikate aus Startup-Scan + Webhook"]
     end
 
     subgraph PROCESS["📄 process-changes Worker"]
-        U --> V[processFile]
-        V --> W[Datei von Google Drive herunterladen\n→ FileStore lokal]
-        W --> X[Datei zu Paperless-ngx hochladen\nPOST /api/documents/post_document/]
-        X --> Y[Datei in Drive verschieben\nSrc-Folder → Dst-Folder]
-        Y --> Z([Fertig])
+        V --> W[processFile]
+        W --> X[Datei von Google Drive herunterladen\n→ FileStore lokal]
+        X --> Y[Datei zu Paperless-ngx hochladen\nPOST /api/documents/post_document/]
+        Y --> Z[Datei in Drive verschieben\nSrc-Folder → Dst-Folder]
+        Z --> AA([Fertig])
     end
 
     subgraph EXTERNAL["Externe Systeme"]
@@ -46,13 +47,14 @@ flowchart TD
         RD[(Redis)]
     end
 
-    K <-->|files.watch API| GD
-    N -->|HTTP POST| WEBHOOK
-    S <-->|changes.list API| GD
-    W <-->|files.get stream| GD
-    X -->|HTTP POST Basic Auth| PL
-    Y -->|files.update parents| GD
-    Y -->|verschoben| GD2
-    R -->|BullMQ| RD
-    U -->|BullMQ| RD
-    H -->|BullMQ| RD
+    L <-->|files.watch API| GD
+    O -->|HTTP POST| WEBHOOK
+    T <-->|changes.list API| GD
+    X <-->|files.get stream| GD
+    Y -->|HTTP POST Basic Auth| PL
+    Z -->|files.update parents| GD
+    Z -->|verschoben| GD2
+    S -->|BullMQ| RD
+    V -->|BullMQ| RD
+    I -->|BullMQ| RD
+    M -->|BullMQ Delayed Job| RD

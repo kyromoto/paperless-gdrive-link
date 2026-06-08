@@ -23,16 +23,6 @@ export const Server = z.object({
 	drive_monitor: z.object({
 		webhook_url: z.string().url(),
 	}),
-	task_schedular: z
-		.object({
-			interval_ms: z
-				.number()
-				.min(1000)
-				.max(60 * 60 * 1000)
-				.default(5 * 1000),
-			concurrency: z.number().min(1).default(5),
-		})
-		.default({}),
 });
 
 export type DriveAccount = z.infer<typeof DriveAccount>;

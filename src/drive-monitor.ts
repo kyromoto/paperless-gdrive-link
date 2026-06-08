@@ -1,17 +1,11 @@
 import crypto from "node:crypto";
-import EventEmitter from "node:events";
 import type { Logger } from "@logtape/logtape";
+import type { Queue } from "bullmq";
 import type { drive_v3 } from "googleapis";
 import { getDriveClient } from "./lib";
-import type { Task, TaskScheduler, TimeoutMs } from "./task-scheduler";
 import type { Account, Config, DriveAccount } from "./types";
 
-export interface DriveMonitorEvents {
-	started: (channelId: string) => void;
-	stopped: (channelId: string) => void;
-}
-
-export type RenewChannelJobPayload = {};
+export type RenewChannelJobPayload = { accountId: string };
 
 export class DriveMonitor {
 	private driveAccount: DriveAccount;
@@ -21,17 +15,13 @@ export class DriveMonitor {
 	private channelExpiration: number | null | undefined = null;
 	private isStarting = false;
 
-	private eventEmitter = new EventEmitter();
-
 	constructor(
 		private readonly logger: Logger,
 		private readonly config: Config,
 		private readonly account: Account,
-		private readonly taskScheduler: TaskScheduler,
+		private readonly renewChannelQueue: Queue<RenewChannelJobPayload>,
 	) {
-		const driveAccount = this.config.drive_accounts.find(
-			(drive) => drive.id === this.account.props.drive_account_id,
-		);
+		const driveAccount = this.config.drive_accounts.find((drive) => drive.id === this.account.props.drive_account_id);
 
 		if (!driveAccount) {
 			throw new Error(`Failed to find drive account for ${this.account.name}`);
@@ -39,8 +29,6 @@ export class DriveMonitor {
 
 		this.driveAccount = driveAccount;
 		this.driveClient = getDriveClient(driveAccount);
-
-		this.eventEmitter.on("renew", this.start.bind(this));
 	}
 
 	public async start() {
@@ -54,12 +42,8 @@ export class DriveMonitor {
 
 		const now = Date.now();
 		const channelId = crypto.randomUUID();
-		const channelAddress = new URL(
-			"/webhook",
-			this.config.server.drive_monitor.webhook_url,
-		).href;
-		const channleExpiration =
-			now + this.driveAccount.props.channel_expiration_sec * 1000;
+		const channelAddress = new URL("/webhook", this.config.server.drive_monitor.webhook_url).href;
+		const channleExpiration = now + this.driveAccount.props.channel_expiration_sec * 1000;
 
 		this.logger.debug({
 			channelId,
@@ -90,27 +74,20 @@ export class DriveMonitor {
 			this.logger.info(`Channel started`, { channel });
 
 			this.channelId = channel.data.id;
-			this.channelExpiration = Number.parseInt(channel.data.expiration);
+			this.channelExpiration = Number.parseInt(channel.data.expiration, 10);
 
 			const renewOffset = 30 * 1000;
-			const renewTimeMs = this.channelExpiration! - renewOffset;
-			const renewTask: Task = {
-				scheduledTime: new Date(renewTimeMs),
-				timeoutMS: renewOffset as TimeoutMs,
-				handler: async (_taskId, _logger) => {
-					this.eventEmitter.emit("renew");
-					return { status: "success" };
-				},
-			};
+			const renewDelayMs = this.channelExpiration - Date.now() - renewOffset;
+			const renewJobId = `renew-channel-${this.account.id}`;
 
-			const { taskId, scheduledTime } =
-				this.taskScheduler.registerTask(renewTask);
-			this.logger.info(
-				`Channel renew task registered: ${taskId} | ${scheduledTime.toUTCString()}`,
-				{ task: renewTask },
+			await this.renewChannelQueue.remove(renewJobId).catch(() => {});
+			await this.renewChannelQueue.add(
+				"renew-channel",
+				{ accountId: this.account.id },
+				{ jobId: renewJobId, delay: renewDelayMs },
 			);
 
-			this.eventEmitter.emit("started", this.channelId);
+			this.logger.info(`Channel renew job scheduled: ${renewJobId} in ${renewDelayMs}ms`);
 		} finally {
 			this.isStarting = false;
 		}
@@ -133,20 +110,8 @@ export class DriveMonitor {
 				},
 			})
 			.catch((err) => {
-				this.logger.error(
-					`Failed to stop channel with id ${channelId}: ${err.message}`,
-					{ error: err },
-				);
+				this.logger.error(`Failed to stop channel with id ${channelId}: ${err.message}`, { error: err });
 			});
-
-		this.eventEmitter.emit("stopped", channelId);
-	}
-
-	public on<K extends keyof DriveMonitorEvents>(
-		event: K,
-		handler: DriveMonitorEvents[K],
-	) {
-		this.eventEmitter.on(event, handler);
 	}
 
 	public getChannelId() {
