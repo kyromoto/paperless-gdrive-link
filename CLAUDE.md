@@ -8,9 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev        # run with tsx watch (hot-reload), reads .env automatically
 npm run build      # compile TypeScript to ./build/
 
-npx biome check    # lint + format check
-npx biome lint     # lint only
-npx biome format   # format only
+npx biome check          # lint + format check
+npx biome lint           # lint only
+npx biome format         # show format diff (read-only)
+npx biome format --write # apply formatting
 ```
 
 There is no test suite.
@@ -75,8 +76,10 @@ On startup, all files currently in the src folder are scanned and queued directl
 | `src/file-store.ts` | Thin wrapper around local filesystem for buffering files between download and upload |
 | `src/lib.ts` | `listFilesRecursive`, `listChangesRecursive` (manages change token), `getDriveClient` |
 | `src/queue-processor.ts` | BullMQ job handler functions (thin adapters into `FileProcessor`) |
+| `src/queue-utils.ts` | `attachWorkerLogging` — attaches active/completed/failed/error listeners to a worker+queue pair |
 | `src/controllers.ts` | Express route handlers for `/webhook` and `/health` |
 | `src/config-repository.ts` | Reads/writes the YAML config file; parses with Zod |
+| `src/env.ts` | Validates and exports env vars via Zod — **throws at import time** if `CONFIG_PATH` is missing |
 
 ### Important invariants
 

@@ -26,13 +26,7 @@ import {
 import { FileStore } from "./file-store";
 import { getDriveClient } from "./lib";
 import { makeCollectChangesQueueProcessor, makeProcessChangesQueueProcessor } from "./queue-processor";
-import { attachWorkerLogging } from "./queue-utils";
-
-type ProcessFileBulkJob = {
-	name: string;
-	data: ProcessChangesJobPayload;
-	opts: bullmq.BulkJobOptions;
-};
+import { attachWorkerLogging, collectOutstandingJobs } from "./queue-utils";
 
 const ROOT_LOGGER_KEY = "app";
 
@@ -254,18 +248,7 @@ const ROOT_LOGGER_KEY = "app";
 	}
 
 	logger.info("Collect outstanding files from watchfolders ...");
-	const processingJobs = (
-		await Promise.all(
-			Array.from(processors.entries()).map<Promise<ProcessFileBulkJob[]>>(async ([accountId, processor]) => {
-				const files = await processor.getUnprocessedFiles("all");
-				return files.map<ProcessFileBulkJob>((file) => ({
-					name: processChangesQueue.name,
-					data: { accountId, file },
-					opts: { jobId: `process-changes-${accountId}-${file.id}` },
-				}));
-			}),
-		)
-	).flat();
+	const processingJobs = await collectOutstandingJobs(processors, processChangesQueue.name);
 
 	logger.info(`Queue ${processingJobs.length} outstanding files for processing ...`, { processingJobs });
 	await processChangesQueue.addBulk(processingJobs);

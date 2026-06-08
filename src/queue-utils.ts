@@ -1,5 +1,30 @@
 import type { Logger } from "@logtape/logtape";
 import type * as bullmq from "bullmq";
+import type { FileProcessor, ProcessChangesJobPayload } from "./file-processor";
+
+export type ProcessFileBulkJob = {
+	name: string;
+	data: ProcessChangesJobPayload;
+	opts: bullmq.BulkJobOptions;
+};
+
+export async function collectOutstandingJobs(
+	processors: Map<string, FileProcessor>,
+	queueName: string,
+): Promise<ProcessFileBulkJob[]> {
+	return (
+		await Promise.all(
+			Array.from(processors.entries()).map(async ([accountId, processor]) => {
+				const files = await processor.getUnprocessedFiles("all");
+				return files.map<ProcessFileBulkJob>((file) => ({
+					name: queueName,
+					data: { accountId, file },
+					opts: { jobId: `process-changes-${accountId}-${file.id}` },
+				}));
+			}),
+		)
+	).flat();
+}
 
 export function attachWorkerLogging<T, R = unknown>(
 	logger: Logger,
