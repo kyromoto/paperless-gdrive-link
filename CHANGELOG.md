@@ -1,3 +1,10 @@
+## [1.5.5](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.5.4...v1.5.5) (2026-06-08)
+
+
+### Bug Fixes
+
+* rc3 - drive monitor start overlap ([09232d1](https://github.com/kyromoto/paperless-gdrive-link/commit/09232d1f445d05297c3a7ab116bd264789813a10))
+
 ## [1.5.4](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.5.3...v1.5.4) (2026-06-07)
 
 
