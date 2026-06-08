@@ -19,19 +19,13 @@ export const handleWebhook = (
 			const state = req.get("X-Goog-Resource-State");
 
 			if (!channelId) {
-				throw new AcceptableWebhookError(
-					`Received webhook without channel id ... ignoring`,
-					200,
-					"OK",
-				);
+				const msg = `Received webhook without channel id ... ignoring`;
+				throw new AcceptableWebhookError(msg, 200, "OK");
 			}
 
 			if (!state) {
-				throw new AcceptableWebhookError(
-					`Received webhook without state ... ignoring`,
-					200,
-					"OK",
-				);
+				const msg = `Received webhook without state ... ignoring`;
+				throw new AcceptableWebhookError(msg, 200, "OK");
 			}
 
 			const accountId = Array.from(monitors.entries()).find(
@@ -42,19 +36,13 @@ export const handleWebhook = (
 			);
 
 			if (!account) {
-				throw new AcceptableWebhookError(
-					`Received webhook for unknown channel id ... ignoring`,
-					200,
-					"OK",
-				);
+				const msg = `Received webhook for unknown account id ${accountId} ... ignoring`;
+				throw new AcceptableWebhookError(msg, 200, "OK");
 			}
 
 			if (state.toLowerCase() === "sync") {
-				throw new AcceptableWebhookError(
-					`${account.name}: Received sync webhook`,
-					200,
-					"OK",
-				);
+				const msg = `${account.name}: Received sync webhook`;
+				throw new AcceptableWebhookError(msg, 200, "OK");
 			}
 
 			await queue.add(

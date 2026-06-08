@@ -7,7 +7,7 @@ import type {
 } from "./file-processor";
 import type { Config } from "./types";
 
-export function makeCollectChangesQueueProcessor<T>(
+export function makeCollectChangesQueueProcessor(
 	logger: Logger,
 	config: Config,
 	processors: Map<string, FileProcessor>,
