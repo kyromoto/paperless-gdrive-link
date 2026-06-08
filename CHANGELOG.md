@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.5.8...v1.6.0) (2026-06-08)
+
+
+### Features
+
+* replace TaskScheduler with BullMQ delayed job for DriveMonitor renewal ([80f3c06](https://github.com/kyromoto/paperless-gdrive-link/commit/80f3c0614e254936d689e11d51b9e6e597797579))
+
 ## [1.5.8](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.5.7...v1.5.8) (2026-06-08)
 
 
