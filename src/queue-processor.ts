@@ -1,10 +1,6 @@
 import type { Logger } from "@logtape/logtape";
 import type { Job } from "bullmq";
-import type {
-	CollectChangesJobPayload,
-	FileProcessor,
-	ProcessChangesJobPayload,
-} from "./file-processor";
+import type { CollectChangesJobPayload, FileProcessor, ProcessChangesJobPayload, ProcessStep } from "./file-processor";
 import type { Config } from "./types";
 
 export function makeCollectChangesQueueProcessor(
@@ -13,9 +9,7 @@ export function makeCollectChangesQueueProcessor(
 	processors: Map<string, FileProcessor>,
 ) {
 	return async (job: Job<CollectChangesJobPayload>) => {
-		const account = config.accounts.find(
-			(account) => account.id === job.data.accountId,
-		);
+		const account = config.accounts.find((account) => account.id === job.data.accountId);
 
 		if (!account) {
 			throw new Error(`Failed to find account ${job.data}`);
@@ -35,18 +29,40 @@ export function makeCollectChangesQueueProcessor(
 	};
 }
 
-export function makeProcessChangesQueueProcessor(
-	processors: Map<string, FileProcessor>,
-) {
+export function makeProcessChangesQueueProcessor(processors: Map<string, FileProcessor>) {
 	return async (job: Job<ProcessChangesJobPayload>) => {
 		const processor = processors.get(job.data.accountId);
 
 		if (!processor) {
-			throw new Error(
-				`Failed to find processor for account ${job.data.accountId}`,
-			);
+			throw new Error(`Failed to find processor for account ${job.data.accountId}`);
 		}
 
-		await processor.processFile(job.data.file);
+		let step: ProcessStep | undefined = job.data.step;
+
+		while (step !== "moved") {
+			switch (step) {
+				case undefined: {
+					await processor.downloadFileFromDrive(job.data.file);
+					step = "downloaded";
+					await job.updateData({ ...job.data, step });
+					break;
+				}
+				case "downloaded": {
+					await processor.uploadFileToPaperless(job.data.file);
+					step = "uploaded";
+					await job.updateData({ ...job.data, step });
+					break;
+				}
+				case "uploaded": {
+					await processor.moveFile(job.data.file);
+					step = "moved";
+					await job.updateData({ ...job.data, step });
+					break;
+				}
+				default: {
+					throw new Error(`Invalid step ${step}`);
+				}
+			}
+		}
 	};
 }

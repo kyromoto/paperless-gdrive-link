@@ -4,10 +4,7 @@ import FormData from "form-data";
 import type { drive_v3 } from "googleapis";
 
 import type { FileStore } from "./file-store";
-import {
-	listChangesRecursive,
-	listFilesRecursive,
-} from "./lib";
+import { listChangesRecursive, listFilesRecursive } from "./lib";
 import type { Account, Config } from "./types";
 
 export interface DriveFile {
@@ -24,9 +21,12 @@ export type CollectChangesJobPayload = {
 
 export type CollectChangesJobResult = DriveFile[];
 
+export type ProcessStep = "downloaded" | "uploaded" | "moved";
+
 export type ProcessChangesJobPayload = {
 	accountId: string;
 	file: DriveFile;
+	step?: ProcessStep;
 };
 
 export type ProcessChangesJobResult = undefined;
@@ -73,43 +73,14 @@ export class FileProcessor {
 			}
 
 			case "changes": {
-				const changes = await listChangesRecursive(
-					this.config,
-					this.account,
-					this.driveClient,
-				);
-				const added = all.filter((file) =>
-					changes.find((change) => change.fileId === file.id),
-				);
+				const changes = await listChangesRecursive(this.config, this.account, this.driveClient);
+				const added = all.filter((file) => changes.find((change) => change.fileId === file.id));
 				return mapper(added);
 			}
 		}
 	}
 
-	public async processFile(file: DriveFile) {
-		this.logger.info(`Processing file ${file.name}...`, { file });
-
-		await this.downloadFileFromDrive(file).catch((err) => {
-			this.logger.error(`Failed to download file ${file.name} from GDrive`, {
-				err,
-			});
-			throw err;
-		});
-
-		await this.uploadFileToPaperless(file).catch((err) => {
-			this.logger.error(`Failed to upload file ${file.name} to Paperless`, {
-				err,
-			});
-			throw err;
-		});
-
-		await this.moveFile(file).catch((err) => {
-			this.logger.error(`Failed to move file ${file.name}`, { err });
-			throw err;
-		});
-	}
-
-	private async downloadFileFromDrive(file: DriveFile) {
+	public async downloadFileFromDrive(file: DriveFile) {
 		this.logger.info(`Downloading file ${file.name} from GDrive ...`, { file });
 
 		const res = await this.driveClient.files.get(
@@ -123,7 +94,7 @@ export class FileProcessor {
 		await this.fileStore.upload(this.getFileStoreName(file), res.data);
 	}
 
-	private async uploadFileToPaperless(file: DriveFile) {
+	public async uploadFileToPaperless(file: DriveFile) {
 		this.logger.info(`Uploading file ${file.name} to Paperless ...`, { file });
 
 		const endpoint = this.config.paperless_endpoints.find(
@@ -131,9 +102,7 @@ export class FileProcessor {
 		);
 
 		if (!endpoint) {
-			throw new Error(
-				`Failed to find paperless endpoint for ${this.account.name}`,
-			);
+			throw new Error(`Failed to find paperless endpoint for ${this.account.name}`);
 		}
 
 		const form = new FormData();
@@ -142,9 +111,8 @@ export class FileProcessor {
 		const password = endpoint.props.credentials.password;
 		const authHeaderValue = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
 
-		const buffer = await this.fileStore.download(this.getFileStoreName(file), {
-			deleteAfterWrite: true,
-		});
+		const storeName = this.getFileStoreName(file);
+		const buffer = await this.fileStore.download(storeName);
 		form.append("document", buffer, {
 			filename: file.name,
 			contentType: file.mimeType,
@@ -162,9 +130,11 @@ export class FileProcessor {
 		if (res.status !== 200) {
 			throw new Error(`Paperless upload failed: ${res.statusText}`);
 		}
+
+		await this.fileStore.delete(storeName);
 	}
 
-	private async moveFile(file: DriveFile) {
+	public async moveFile(file: DriveFile) {
 		this.logger.info(`Moving file ${file.name}...`, { file });
 
 		await this.driveClient.files.update({

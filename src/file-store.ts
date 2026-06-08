@@ -40,6 +40,11 @@ export class FileStore {
 		return buffer;
 	}
 
+	public async delete(id: string) {
+		this.checkInitialized();
+		await fsPromises.unlink(this.getFilename(id));
+	}
+
 	private getFilename(id: string) {
 		return path.join(this.path, id);
 	}
