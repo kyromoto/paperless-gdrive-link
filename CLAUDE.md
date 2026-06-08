@@ -76,9 +76,10 @@ On startup, all files currently in the src folder are scanned and queued directl
 | `src/file-store.ts` | Thin wrapper around local filesystem for buffering files between download and upload |
 | `src/lib.ts` | `listFilesRecursive`, `listChangesRecursive` (manages change token), `getDriveClient` |
 | `src/queue-processor.ts` | BullMQ job handler functions (thin adapters into `FileProcessor`) |
-| `src/queue-utils.ts` | `attachWorkerLogging` — attaches active/completed/failed/error listeners to a worker+queue pair |
+| `src/queue-utils.ts` | `attachWorkerLogging` (worker event listeners) + `collectOutstandingJobs` (startup scan helper) |
 | `src/controllers.ts` | Express route handlers for `/webhook` and `/health` |
 | `src/config-repository.ts` | Reads/writes the YAML config file; parses with Zod |
+| `src/repositories.ts` | `ConfigRepository` interface — abstracts config read access |
 | `src/env.ts` | Validates and exports env vars via Zod — **throws at import time** if `CONFIG_PATH` is missing |
 
 ### Important invariants
