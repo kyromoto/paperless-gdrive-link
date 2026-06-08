@@ -1,3 +1,10 @@
+## [1.5.6](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.5.5...v1.5.6) (2026-06-08)
+
+
+### Bug Fixes
+
+* rc4 - startup scan job name used wrong queue name ([b9c6645](https://github.com/kyromoto/paperless-gdrive-link/commit/b9c6645cbcf6494cd704be2b8dc7c74fb8691aa4))
+
 ## [1.5.5](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.5.4...v1.5.5) (2026-06-08)
 
 
