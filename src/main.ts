@@ -309,7 +309,7 @@ const ROOT_LOGGER_KEY = "app";
 				async ([accountId, processor]) => {
 					const files = await processor.getUnprocessedFiles("all");
 					return files.map<ProcessFileBulkJob>((file) => ({
-						name: collectChangesQueue.name,
+						name: processChangesQueue.name,
 						data: { accountId, file },
 						opts: { jobId: `process-changes-${accountId}-${file.id}` },
 					}));
