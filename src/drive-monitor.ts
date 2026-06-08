@@ -19,6 +19,7 @@ export class DriveMonitor {
 
 	private channelId: string | null | undefined = null;
 	private channelExpiration: number | null | undefined = null;
+	private isStarting = false;
 
 	private eventEmitter = new EventEmitter();
 
@@ -43,6 +44,12 @@ export class DriveMonitor {
 	}
 
 	public async start() {
+		if (this.isStarting) {
+			this.logger.warn("start() already in progress, skipping duplicate call");
+			return;
+		}
+		this.isStarting = true;
+
 		this.logger.info(`Starting ...`);
 
 		const now = Date.now();
@@ -60,49 +67,53 @@ export class DriveMonitor {
 			channleExpiration,
 		});
 
-		const channel = await this.driveClient.files.watch({
-			fileId: this.account.props.drive_src_folder_id,
-			requestBody: {
-				id: channelId,
-				type: "webhook",
-				address: channelAddress,
-				expiration: channleExpiration.toString(),
-				payload: true,
-			},
-		});
+		try {
+			const channel = await this.driveClient.files.watch({
+				fileId: this.account.props.drive_src_folder_id,
+				requestBody: {
+					id: channelId,
+					type: "webhook",
+					address: channelAddress,
+					expiration: channleExpiration.toString(),
+					payload: true,
+				},
+			});
 
-		if (!channel.data.id) {
-			throw new Error("Channel start failed: id not set");
+			if (!channel.data.id) {
+				throw new Error("Channel start failed: id not set");
+			}
+
+			if (!channel.data.expiration) {
+				throw new Error("Channel start failed: expiration not set");
+			}
+
+			this.logger.info(`Channel started`, { channel });
+
+			this.channelId = channel.data.id;
+			this.channelExpiration = Number.parseInt(channel.data.expiration);
+
+			const renewOffset = 30 * 1000;
+			const renewTimeMs = this.channelExpiration! - renewOffset;
+			const renewTask: Task = {
+				scheduledTime: new Date(renewTimeMs),
+				timeoutMS: renewOffset as TimeoutMs,
+				handler: async (_taskId, _logger) => {
+					this.eventEmitter.emit("renew");
+					return { status: "success" };
+				},
+			};
+
+			const { taskId, scheduledTime } =
+				this.taskScheduler.registerTask(renewTask);
+			this.logger.info(
+				`Channel renew task registered: ${taskId} | ${scheduledTime.toUTCString()}`,
+				{ task: renewTask },
+			);
+
+			this.eventEmitter.emit("started", this.channelId);
+		} finally {
+			this.isStarting = false;
 		}
-
-		if (!channel.data.expiration) {
-			throw new Error("Channel start failed: expiration not set");
-		}
-
-		this.logger.info(`Channel started`, { channel });
-
-		this.channelId = channel.data.id;
-		this.channelExpiration = Number.parseInt(channel.data.expiration);
-
-		const renewOffset = 30 * 1000;
-		const renewTimeMs = this.channelExpiration! - renewOffset;
-		const renewTask: Task = {
-			scheduledTime: new Date(renewTimeMs),
-			timeoutMS: renewOffset as TimeoutMs,
-			handler: async (_taskId, _logger) => {
-				this.eventEmitter.emit("renew");
-				return { status: "success" };
-			},
-		};
-
-		const { taskId, scheduledTime } =
-			this.taskScheduler.registerTask(renewTask);
-		this.logger.info(
-			`Channel renew task registered: ${taskId} | ${scheduledTime.toUTCString()}`,
-			{ task: renewTask },
-		);
-
-		this.eventEmitter.emit("started", this.channelId);
 	}
 
 	public async stop(channelId?: string) {
