@@ -143,9 +143,3 @@ export const createNotificationTask =
 		logger.info(`Getting unprocessed files...`);
 		return await processor.getUnprocessedFiles("changes");
 	};
-
-export const createFileTask =
-	(logger: Logger, processor: FileProcessor, file: DriveFile) => async () => {
-		logger.info(`Processing file ${file.name}...`, { file });
-		await processor.processFile(file);
-	};
