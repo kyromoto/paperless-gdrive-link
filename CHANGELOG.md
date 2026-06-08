@@ -1,3 +1,11 @@
+## [1.5.7](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.5.6...v1.5.7) (2026-06-08)
+
+
+### Bug Fixes
+
+* some code cleanup ([7401608](https://github.com/kyromoto/paperless-gdrive-link/commit/74016085c4b0827f40a37f7437ed3d1991205985))
+* use BullMQ job steps for process-changes to prevent duplicate Paperless uploads on retry ([a36ad48](https://github.com/kyromoto/paperless-gdrive-link/commit/a36ad48e235c84fb1ed63df20d661d57a47ad456))
+
 ## [1.5.6](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.5.5...v1.5.6) (2026-06-08)
 
 
