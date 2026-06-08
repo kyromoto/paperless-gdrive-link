@@ -1,4 +1,4 @@
-# paperless-gdrive-bridge
+# paperfeed
 
 Use Google Drive as a watch folder for [paperless-ngx](https://docs.paperless-ngx.com/). Files dropped into a configured Drive source folder are automatically downloaded, uploaded to Paperless-ngx, and moved to a destination folder.
 
