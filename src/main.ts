@@ -26,6 +26,7 @@ import {
 import { FileStore } from "./file-store";
 import { getDriveClient } from "./lib";
 import { makeCollectChangesQueueProcessor, makeProcessChangesQueueProcessor } from "./queue-processor";
+import { attachWorkerLogging } from "./queue-utils";
 
 type ProcessFileBulkJob = {
 	name: string;
@@ -143,29 +144,26 @@ const ROOT_LOGGER_KEY = "app";
 		"collect-changes",
 		queueOptions,
 	);
-	
+
 	const processChangesQueue = new bullmq.Queue<ProcessChangesJobPayload, ProcessChangesJobResult>(
 		"process-changes",
 		queueOptions,
 	);
-	
-	const renewChannelQueue = new bullmq.Queue<RenewChannelJobPayload>(
-		"renew-channel",
-		queueOptions,
-	);
-	
+
+	const renewChannelQueue = new bullmq.Queue<RenewChannelJobPayload>("renew-channel", queueOptions);
+
 	const collectChangesWorker = new bullmq.Worker(
 		collectChangesQueue.name,
 		makeCollectChangesQueueProcessor(logger.getChild(collectChangesQueue.name), config, processors),
 		{ ...workerOptions, concurrency: config.server.queue.concurrency.collect },
 	);
-	
+
 	const processChangesWorker = new bullmq.Worker(
 		processChangesQueue.name,
 		makeProcessChangesQueueProcessor(processors),
 		{ ...workerOptions, concurrency: config.server.queue.concurrency.process },
 	);
-	
+
 	const renewChannelWorker = new bullmq.Worker<RenewChannelJobPayload>(
 		renewChannelQueue.name,
 		async (job) => {
@@ -179,78 +177,38 @@ const ROOT_LOGGER_KEY = "app";
 		workerOptions,
 	);
 
-	collectChangesWorker.on("active", (job) => {
-		logger
-			.getChild([collectChangesQueue.name, job.id?.toString() || "unkown-id"])
-			.info(`${job.data.accountId} collecting changes started`, { job });
-	});
+	attachWorkerLogging<CollectChangesJobPayload, CollectChangesJobResult>(
+		logger,
+		collectChangesWorker,
+		collectChangesQueue,
+		(d) => `${d?.accountId ?? "unknown-account"} collecting changes`,
+		async (job, files) => {
+			logger
+				.getChild([collectChangesQueue.name, job.id ?? "unknown-id"])
+				.info(`${files.length} files collected`, { job, files });
+			await processChangesQueue.addBulk(
+				files.map((file) => ({
+					name: "process-changes",
+					data: { accountId: job.data.accountId, file },
+					opts: { jobId: `process-changes-${job.data.accountId}-${file.id}` },
+				})),
+			);
+		},
+	);
 
-	collectChangesWorker.on("completed", async (job, files) => {
-		logger
-			.getChild([collectChangesQueue.name, job.id?.toString() || "unkown-id"])
-			.info(`${files.length} files collected`, { job, files });
-		await processChangesQueue.addBulk(
-			files.map((file) => ({
-				name: "process-changes",
-				data: { accountId: job.data.accountId, file },
-				opts: { jobId: `process-changes-${job.data.accountId}-${file.id}` },
-			})),
-		);
-	});
+	attachWorkerLogging(
+		logger,
+		processChangesWorker,
+		processChangesQueue,
+		(d) => `${d?.file.name ?? "unknown-file"} processing`,
+	);
 
-	collectChangesWorker.on("failed", (job, error) => {
-		logger
-			.getChild([collectChangesQueue.name, job?.id?.toString() || "unkown-id"])
-			.error(`${job?.data.accountId || "unkown-account"} collecting changes failed: ${error.message}`, { job, error });
-	});
-
-	collectChangesQueue.on("error", (error) => {
-		logger.getChild(collectChangesQueue.name).error(`queue error: ${error.message}`, { error });
-	});
-
-	processChangesWorker.on("active", (job) => {
-		logger
-			.getChild([processChangesQueue.name, job.id?.toString() || "unkown-id"])
-			.info(`${job.data.file.name} processing started`, { job });
-	});
-
-	processChangesWorker.on("completed", (job, result) => {
-		logger
-			.getChild([processChangesQueue.name, job.id?.toString() || "unkown-id"])
-			.info(`${job.data.file.name} processed`, { result });
-	});
-
-	processChangesWorker.on("failed", (job, error) => {
-		logger
-			.getChild([processChangesQueue.name, job?.id?.toString() || "unkown-id"])
-			.error(`${job?.data.file.name || "unkown-file"} processing failed: ${error.message}`, { error });
-	});
-
-	processChangesQueue.on("error", (error) => {
-		logger.getChild(processChangesQueue.name).error(`queue error: ${error.message}`, { error });
-	});
-
-	renewChannelWorker.on("active", (job) => {
-		logger
-			.getChild([renewChannelQueue.name, job.id?.toString() || "unkown-id"])
-			.info(`${job.data.accountId} channel renewal started`, { job });
-	});
-
-	renewChannelWorker.on("completed", (job) => {
-		logger
-			.getChild([renewChannelQueue.name, job.id?.toString() || "unkown-id"])
-			.info(`${job.data.accountId} channel renewal completed`, { job });
-	});
-
-	renewChannelWorker.on("failed", (job, error) => {
-		logger
-			.getChild([renewChannelQueue.name, job?.id?.toString() || "unknown-id"])
-			.error(`${job?.data.accountId || "unknown-account"} channel renewal failed: ${error.message}`, { error });
-	});
-
-	renewChannelQueue.on("error", (error) => {
-		logger.getChild(renewChannelQueue.name).error(`queue error: ${error.message}`, { error });
-	});
+	attachWorkerLogging(
+		logger,
+		renewChannelWorker,
+		renewChannelQueue,
+		(d) => `${d?.accountId ?? "unknown-account"} channel renewal`,
+	);
 
 	logger.info("Initializing file processors ...");
 
