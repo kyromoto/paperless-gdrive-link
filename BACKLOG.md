@@ -14,6 +14,34 @@
 
 ---
 
+## Feature — Matrix-Benachrichtigung bei finalem Job-Fehler
+
+**Ziel:** Wenn ein BullMQ-Job alle Retry-Versuche ausgeschöpft hat und final fehlschlägt, wird eine Nachricht an einen konfigurierten Matrix-Raum gesendet.
+
+**Umsetzung (4 Dateien):**
+
+1. **`src/types.ts`** — Optionalen `notifications.matrix`-Block zum `Server`-Zod-Schema hinzufügen:
+   - `homeserver_url`, `access_token`, `room_id`
+
+2. **`src/matrix-notifier.ts`** — Neue Datei (~30 Zeilen). Thin wrapper um die Matrix CS API (`PUT /_matrix/client/v3/rooms/{roomId}/send/m.room.message/{txnId}`), nutzt `axios`.
+
+3. **`src/queue-utils.ts`** — `attachWorkerLogging` um optionalen 6. Parameter `onFinalFailure` erweitern. Finale Fehler erkennen via `job.attemptsMade >= (job.opts.attempts ?? 1)`. Im bestehenden `failed`-Handler aufrufen.
+
+4. **`src/main.ts`** — `MatrixNotifier` instanziieren (falls konfiguriert), als `onFinalFailure`-Callback an alle drei `attachWorkerLogging`-Aufrufe übergeben.
+
+**Nachrichtenformat:**
+```
+[paperfeed] Job final fehlgeschlagen
+Queue: process-changes
+Job: invoice.pdf (account: personal)
+Fehler: HTTP 500 from Paperless
+Versuche: 3/3
+```
+
+**Hinweis:** Credentials im YAML (konsistent mit Drive/Paperless). Plain `axios` statt Matrix SDK — für ein einziges `send` nicht nötig.
+
+---
+
 ## Refactoring — Lesbarkeit `main.ts`
 
 Zwei unabhängige Verbesserungen, können einzeln umgesetzt werden.
