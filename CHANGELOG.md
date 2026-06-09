@@ -1,3 +1,10 @@
+## [1.6.2](https://github.com/kyromoto/paperfeed/compare/v1.6.1...v1.6.2) (2026-06-09)
+
+
+### Bug Fixes
+
+* channel renew offset moved to channel expiration time ([75c4267](https://github.com/kyromoto/paperfeed/commit/75c426786639a0b4d2f8b95ce6bedbf04e012e65))
+
 ## [1.6.1](https://github.com/kyromoto/paperfeed/compare/v1.6.0...v1.6.1) (2026-06-09)
 
 
