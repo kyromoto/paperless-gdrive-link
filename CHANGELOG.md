@@ -1,3 +1,10 @@
+## [1.6.1](https://github.com/kyromoto/paperfeed/compare/v1.6.0...v1.6.1) (2026-06-09)
+
+
+### Bug Fixes
+
+* renwal of drive monitors ([2066ba4](https://github.com/kyromoto/paperfeed/commit/2066ba4da94af77a61e85bae0c29f7ee63353c4e))
+
 # [1.6.0](https://github.com/kyromoto/paperless-gdrive-link/compare/v1.5.8...v1.6.0) (2026-06-08)
 
 
