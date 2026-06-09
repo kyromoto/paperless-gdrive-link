@@ -25,7 +25,7 @@ import {
 } from "./file-processor";
 import { FileStore } from "./file-store";
 import { getDriveClient } from "./lib";
-import { makeCollectChangesQueueProcessor, makeProcessChangesQueueProcessor } from "./queue-processor";
+import { makeCollectChangesQueueProcessor, makeProcessChangesQueueProcessor, makeRenewChannelQueueProcessor } from "./queue-processor";
 import { attachWorkerLogging, collectOutstandingJobs } from "./queue-utils";
 
 const ROOT_LOGGER_KEY = "app";
@@ -144,7 +144,10 @@ const ROOT_LOGGER_KEY = "app";
 		queueOptions,
 	);
 
-	const renewChannelQueue = new bullmq.Queue<RenewChannelJobPayload>("renew-channel", queueOptions);
+	const renewChannelQueue = new bullmq.Queue<RenewChannelJobPayload>(
+		"renew-channel",
+		queueOptions
+	);
 
 	const collectChangesWorker = new bullmq.Worker(
 		collectChangesQueue.name,
@@ -158,17 +161,10 @@ const ROOT_LOGGER_KEY = "app";
 		{ ...workerOptions, concurrency: config.server.queue.concurrency.process },
 	);
 
-	const renewChannelWorker = new bullmq.Worker<RenewChannelJobPayload>(
+	const renewChannelWorker = new bullmq.Worker(
 		renewChannelQueue.name,
-		async (job) => {
-			const monitor = monitors.get(job.data.accountId);
-			if (!monitor) {
-				logger.error(`No monitor found for accountId ${job.data.accountId}`);
-				return;
-			}
-			await monitor.start();
-		},
-		workerOptions,
+		makeRenewChannelQueueProcessor(monitors),
+		{ ...workerOptions, concurrency: config.server.queue.concurrency.renew },
 	);
 
 	attachWorkerLogging<CollectChangesJobPayload, CollectChangesJobResult>(

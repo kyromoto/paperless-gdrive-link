@@ -76,11 +76,16 @@ export class DriveMonitor {
 			this.channelId = channel.data.id;
 			this.channelExpiration = Number.parseInt(channel.data.expiration, 10);
 
-			const renewOffset = 30 * 1000;
-			const renewDelayMs = this.channelExpiration - Date.now() - renewOffset;
+			const renewOffsetMs = 30 * 1000;
+			const renewDelayMs = this.channelExpiration - Date.now() - renewOffsetMs;
 			const renewJobId = `renew-channel-${this.account.id}`;
 
-			await this.renewChannelQueue.remove(renewJobId).catch(() => {});
+			await this.renewChannelQueue.remove(renewJobId).catch(err => {
+				this.logger.warn("Failed to remove existing renew channel job with id {id}: {msg}", {
+					id: renewJobId,
+					msg: err.message
+				});
+			});
 			await this.renewChannelQueue.add(
 				"renew-channel",
 				{ accountId: this.account.id },

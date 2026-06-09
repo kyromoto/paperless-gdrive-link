@@ -17,6 +17,7 @@ export const Server = z.object({
 			.object({
 				collect: z.number().min(1).default(5),
 				process: z.number().min(1).default(1),
+				renew: z.number().min(1).default(1),
 			})
 			.default({}),
 	}),
