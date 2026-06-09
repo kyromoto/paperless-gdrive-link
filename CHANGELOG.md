@@ -1,3 +1,10 @@
+## [1.6.3](https://github.com/kyromoto/paperfeed/compare/v1.6.2...v1.6.3) (2026-06-09)
+
+
+### Bug Fixes
+
+* add offsett to channel expiration and reduce job delay by offset ([b4b6b18](https://github.com/kyromoto/paperfeed/commit/b4b6b180510261ce2db5707dffb4b09b299a4e5a))
+
 ## [1.6.2](https://github.com/kyromoto/paperfeed/compare/v1.6.1...v1.6.2) (2026-06-09)
 
 
