@@ -41,9 +41,10 @@ export class DriveMonitor {
 		this.logger.info(`Starting ...`);
 
 		const now = Date.now();
+		const renewOffsetMs = 30 * 1000;
 		const channelId = crypto.randomUUID();
 		const channelAddress = new URL("/webhook", this.config.server.drive_monitor.webhook_url).href;
-		const channleExpiration = now + this.driveAccount.props.channel_expiration_sec * 1000;
+		const channleExpiration = now + renewOffsetMs + (this.driveAccount.props.channel_expiration_sec * 1000);
 
 		this.logger.debug({
 			channelId,
@@ -76,8 +77,7 @@ export class DriveMonitor {
 			this.channelId = channel.data.id;
 			this.channelExpiration = Number.parseInt(channel.data.expiration, 10);
 
-			const renewOffsetMs = 30 * 1000;
-			const renewDelayMs = this.channelExpiration - Date.now() - renewOffsetMs;
+			const renewDelayMs = this.channelExpiration - Date.now();
 			const renewJobId = `renew-channel-${this.account.id}`;
 
 			await this.renewChannelQueue.remove(renewJobId).catch(err => {
