@@ -1,3 +1,10 @@
+## [1.6.4](https://github.com/kyromoto/paperfeed/compare/v1.6.3...v1.6.4) (2026-06-10)
+
+
+### Bug Fixes
+
+* update renew channel job delay if exists ([57d9b4c](https://github.com/kyromoto/paperfeed/commit/57d9b4cd0d905439dcf0d5ad09e65bb73dfa8977))
+
 ## [1.6.3](https://github.com/kyromoto/paperfeed/compare/v1.6.2...v1.6.3) (2026-06-09)
 
 
