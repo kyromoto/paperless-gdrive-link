@@ -41,7 +41,7 @@ Google Drive (src folder)
     │
     ▼ [files.watch webhook channel]
 DriveMonitor  ──delayed job──▶  renew-channel Queue  (BullMQ/Redis)
-    │                               jobId = "renew-channel-{accountId}" ← fires 30s before expiry
+    │                               jobId = "renew-channel-{accountId}-{timestamp}" ← fires 30s before expiry
     │ Google Drive sends HTTP POST
     ▼
 POST /webhook  (controllers.ts)
@@ -86,7 +86,7 @@ On startup, all files currently in the src folder are scanned and queued directl
 
 - The `collect-changes` jobId is `collect-changes-${accountId}` (deterministic). This prevents concurrent collect jobs for the same account from racing on the Drive change token. Do not change it to a random ID.
 - The `process-changes` jobId is `process-changes-${accountId}-${fileId}` (deterministic). This prevents the same file from being downloaded/uploaded to Paperless twice concurrently (FileStore collision). Do not change it to a random ID.
-- The `renew-channel` jobId is `renew-channel-${accountId}` (deterministic). `monitor.start()` removes any existing job with this ID before adding a new one, so each account always has at most one pending renewal. The queue is drained on startup to clear stale jobs from the previous process.
+- The `renew-channel` jobId is `renew-channel-${accountId}-${timestamp}` (unique per cycle). `DriveMonitor` tracks the current pending job ID in `currentRenewJobId` (in-memory). On each `start()` call, any existing delayed/waiting job is removed before adding the new one — at most one pending renewal per account at any time, while completed jobs stay in history. The queue is drained on startup (`renewChannelQueue.drain()`) to clear stale delayed jobs from the previous process. Do not revert to a deterministic ID: BullMQ's jobId uniqueness check fires before the `deduplication.id` check (see `addStandardJob.lua`), so a deterministic ID blocks the new delayed job from being added while the renew job is still active.
 - The Drive change token is persisted to disk at `{data_path}/tokens/{accountId}.{folderId}.change-token.txt`. If the token file is missing, the app bootstraps a fresh one from `changes.getStartPageToken`.
 - `process-changes` worker runs with concurrency 1 by default. Increasing it risks concurrent FileStore access for the same file (same `{accountId}_{fileId}` path).
 - `@logtape/redaction` automatically strips JWTs and private keys from logs. Do not bypass the logger for sensitive config fields.
