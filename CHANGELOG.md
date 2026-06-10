@@ -1,3 +1,10 @@
+## [1.6.5](https://github.com/kyromoto/paperfeed/compare/v1.6.4...v1.6.5) (2026-06-10)
+
+
+### Bug Fixes
+
+* use unique jobId per renew cycle to avoid BullMQ active-state conflict ([f202ca9](https://github.com/kyromoto/paperfeed/commit/f202ca948dc6091525e26031bbe4ccad5eb20f8a))
+
 ## [1.6.4](https://github.com/kyromoto/paperfeed/compare/v1.6.3...v1.6.4) (2026-06-10)
 
 
