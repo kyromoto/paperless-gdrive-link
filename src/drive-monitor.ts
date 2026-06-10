@@ -80,19 +80,35 @@ export class DriveMonitor {
 			const renewDelayMs = Math.max(0, this.channelExpiration - Date.now() - renewOffsetMs);
 			const renewJobId = `renew-channel-${this.account.id}`;
 
-			await this.renewChannelQueue.remove(renewJobId).catch(err => {
-				this.logger.warn("Failed to remove existing renew channel job with id {id}: {msg}", {
-					id: renewJobId,
-					msg: err.message
-				});
-			});
-			await this.renewChannelQueue.add(
-				"renew-channel",
-				{ accountId: this.account.id },
-				{ jobId: renewJobId, delay: renewDelayMs },
-			);
+			this.logger.debug(`Scheduling channel renew job with id ${renewJobId} in ${renewDelayMs}ms`);
+			this.logger.trace(`Checking for existing channel renew job with id ${renewJobId}`);
+			const job = await this.renewChannelQueue.getJob(renewJobId);
 
-			this.logger.info(`Channel renew job scheduled: ${renewJobId} in ${renewDelayMs}ms`);
+			if (job) {
+				await job.changeDelay(renewDelayMs);
+				this.logger.info(`Channel renew job already exists, updated delay to ${renewDelayMs}ms`);
+			} else {
+				await this.renewChannelQueue.add(
+					"renew-channel",
+					{ accountId: this.account.id },
+					{ jobId: renewJobId, delay: renewDelayMs },
+				);
+				this.logger.info(`Channel renew job scheduled: ${renewJobId} in ${renewDelayMs}ms`);
+			}
+
+			// await this.renewChannelQueue.remove(renewJobId).catch(err => {
+			// 	this.logger.warn("Failed to remove existing renew channel job with id {id}: {msg}", {
+			// 		id: renewJobId,
+			// 		msg: err.message
+			// 	});
+			// });
+			// await this.renewChannelQueue.add(
+			// 	"renew-channel",
+			// 	{ accountId: this.account.id },
+			// 	{ jobId: renewJobId, delay: renewDelayMs },
+			// );
+
+			
 		} finally {
 			this.isStarting = false;
 		}
